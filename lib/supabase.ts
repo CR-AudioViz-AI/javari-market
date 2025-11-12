@@ -54,6 +54,32 @@ export async function getStockPicksByAI(aiName: string) {
   return data as StockPick[]
 }
 
+// Fetch stock picks with optional filters
+export async function getStockPicks(filters?: { symbol?: string; aiName?: string; status?: string }) {
+  let query = supabase
+    .from('stock_picks')
+    .select('*')
+  
+  if (filters?.symbol) {
+    query = query.eq('symbol', filters.symbol.toUpperCase())
+  }
+  
+  if (filters?.aiName) {
+    query = query.eq('ai_name', filters.aiName)
+  }
+  
+  if (filters?.status) {
+    query = query.eq('status', filters.status)
+  }
+  
+  query = query.order('created_at', { ascending: false })
+  
+  const { data, error } = await query
+  
+  if (error) throw error
+  return data as StockPick[]
+}
+
 // Fetch AI models
 export async function getAIModels() {
   const { data, error } = await supabase
