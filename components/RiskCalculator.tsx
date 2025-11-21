@@ -99,7 +99,7 @@ export function RiskCalculator() {
           <div>
             <p className="font-semibold capitalize">{riskLevel} Risk Profile</p>
             <p className="text-sm text-slate-300">
-              {riskLevel === 'conservative' ? 'Excellent! You're protecting your capital.' :
+              {riskLevel === 'conservative' ? 'Excellent! You\'re protecting your capital.' :
                riskLevel === 'moderate' ? 'Good balance of risk and reward.' :
                'High risk! Consider reducing position size.'}
             </p>
