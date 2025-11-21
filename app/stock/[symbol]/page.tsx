@@ -258,7 +258,7 @@ export default function StockDetailPage() {
                   <div className="flex items-center gap-3">
                     <div 
                       className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg"
-                      style={{ background: getAIColor(pick.ai_name) }}
+                      style={{ background: getAIColor(pick.ai_name).primary }}
                     >
                       {pick.ai_name.charAt(0)}
                     </div>
@@ -272,12 +272,12 @@ export default function StockDetailPage() {
                   </div>
                   
                   <div className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 ${
-                    pick.direction === 'bullish' 
+                    pick.target_price > pick.entry_price 
                       ? 'bg-green-500/20 text-green-500' 
                       : 'bg-red-500/20 text-red-500'
                   }`}>
-                    {pick.direction === 'bullish' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {pick.direction.toUpperCase()}
+                    {pick.target_price > pick.entry_price ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                    {(pick.target_price > pick.entry_price ? 'BULLISH' : 'BEARISH')}
                   </div>
                 </div>
 
@@ -358,4 +358,5 @@ export default function StockDetailPage() {
     </div>
   )
 }
+
 
