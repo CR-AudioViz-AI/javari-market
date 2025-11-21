@@ -298,13 +298,6 @@ export default function StockDetailPage() {
                 </div>
 
                 {/* Confidence */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                    <span>Confidence</span>
-                    <span className="font-bold text-white">{pick.confidence_score}%</span>
-                  </div>
-                  <div className="w-full bg-slate-700 rounded-full h-2">
-                    <div 
                       className={`h-full rounded-full transition-all ${
                         pick.confidence_score >= 80 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
                         pick.confidence_score >= 60 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
@@ -320,13 +313,6 @@ export default function StockDetailPage() {
                   {pick.reasoning}
                 </div>
 
-                {/* Timeframe */}
-                {pick.timeframe_days && (
-                  <div className="mt-3 text-xs text-slate-400 flex items-center gap-1">
-                    <Activity className="w-3 h-3" />
-                    Expected timeframe: {pick.timeframe_days} days
-                  </div>
-                )}
               </div>
             )
           })}
@@ -358,5 +344,6 @@ export default function StockDetailPage() {
     </div>
   )
 }
+
 
 
