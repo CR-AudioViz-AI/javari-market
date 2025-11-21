@@ -76,7 +76,7 @@ export function AIPerformanceHeatMap() {
         <div className="inline-block min-w-full">
           <div className="flex items-center mb-2">
             <div className="w-32 flex-shrink-0"></div>
-            {dates.map(date => (
+            {dates.map(((date: string) => (
               <div key={date} className="w-24 text-center flex-shrink-0">
                 <p className="text-xs text-slate-400">{date}</p>
               </div>
@@ -129,3 +129,4 @@ export function AIPerformanceHeatMap() {
     </div>
   )
 }
+
