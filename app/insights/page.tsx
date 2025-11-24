@@ -37,7 +37,7 @@ export default function InsightsPage() {
 
     if (searchTerm) {
       filtered = filtered.filter(p => 
-        p.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ((p.symbol || p.ticker) || p.ticker || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.reasoning.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
@@ -62,7 +62,7 @@ export default function InsightsPage() {
       ['AI', 'Symbol', 'Entry', 'Target', 'Confidence', 'Date', 'Reasoning'].join(','),
       ...filteredPicks.map(p => [
         p.ai_name,
-        p.symbol,
+        (p.symbol || p.ticker),
         p.entry_price,
         p.target_price,
         p.confidence_score,
