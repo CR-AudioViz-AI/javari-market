@@ -5,211 +5,243 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Types for our database
+// Types matching frontend expectations
 export type StockPick = {
   id: string
-  competition_id: string
+  battle_id: string
   ai_model_id: string
-  ticker: string
-  symbol?: string  // Alias for ticker (backward compat)
-  pick_date: string
-  week_number: number
-  direction: 'UP' | 'DOWN' | 'HOLD'
-  confidence: number
-  confidence_score?: number  // Alias for confidence (backward compat)
+  ai_name: string
+  symbol: string
   entry_price: number
   target_price: number
-  stop_loss: number
+  confidence_score: number
   reasoning: string
-  current_price: number | null
-  price_change_percent: number | null
-  status: 'active' | 'won' | 'lost' | 'expired'
-  result: string | null
-  profit_loss: number | null
-  points_earned: number | null
-  expiry_date: string
-  closed_at: string | null
+  status: 'OPEN' | 'CLOSED'
+  pick_date: string
   created_at: string
-  updated_at: string
-  // Joined field
-  ai_name?: string
+  // Additional fields from new schema
+  direction?: string
+  stop_loss?: number
+  current_price?: number
+  profit_loss?: number
 }
 
 export type AIModel = {
   id: string
-  name: string
+  ai_name: string
   display_name: string
   provider: string
-  model_id: string
-  description: string
-  color: string
   is_active: boolean
-  total_picks: number
-  total_wins: number
-  total_losses: number
-  win_rate: number
-  total_profit_loss: number
-  created_at: string
+  color_primary: string
+  color_secondary: string
 }
 
-// Fetch all stock picks with AI name
-export async function getAllStockPicks() {
-  const { data, error } = await supabase
-    .from('stock_picks')
-    .select(`
-      *,
-      ai_models (name, display_name, color)
-    `)
-    .order('created_at', { ascending: false })
-  
-  if (error) {
-    console.error('Error fetching picks:', error)
+// Map database row to frontend format
+function mapPickToFrontend(row: any): StockPick {
+  return {
+    id: row.id,
+    battle_id: row.competition_id || row.battle_id || '',
+    ai_model_id: row.ai_model_id || '',
+    ai_name: row.ai_models?.display_name || row.ai_models?.name || row.ai_name || 'Unknown',
+    symbol: row.ticker || row.symbol || '',
+    entry_price: row.entry_price || 0,
+    target_price: row.target_price || 0,
+    confidence_score: row.confidence || row.confidence_score || 0,
+    reasoning: row.reasoning || '',
+    status: row.status === 'active' ? 'OPEN' : 'CLOSED',
+    pick_date: row.pick_date || row.created_at || '',
+    created_at: row.created_at || '',
+    direction: row.direction,
+    stop_loss: row.stop_loss,
+    current_price: row.current_price,
+    profit_loss: row.profit_loss,
+  }
+}
+
+// Fetch all stock picks
+export async function getAllStockPicks(): Promise<StockPick[]> {
+  try {
+    const { data, error } = await supabase
+      .from('stock_picks')
+      .select(`
+        *,
+        ai_models (name, display_name, color)
+      `)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching picks:', error)
+      return []
+    }
+    
+    return (data || []).map(mapPickToFrontend)
+  } catch (e) {
+    console.error('Exception fetching picks:', e)
     return []
   }
-  
-  // Map to include ai_name for backward compatibility
-  return (data || []).map(pick => ({
-    ...pick,
-    ai_name: pick.ai_models?.display_name || pick.ai_models?.name || 'Unknown',
-    symbol: pick.ticker, // backward compatibility
-    confidence_score: pick.confidence, // backward compatibility
-  }))
 }
 
 // Fetch stock picks by AI
-export async function getStockPicksByAI(aiName: string) {
-  const { data: aiModel } = await supabase
-    .from('ai_models')
-    .select('id')
-    .eq('name', aiName)
-    .single()
-  
-  if (!aiModel) return []
-  
-  const { data, error } = await supabase
-    .from('stock_picks')
-    .select(`*, ai_models (name, display_name, color)`)
-    .eq('ai_model_id', aiModel.id)
-    .order('created_at', { ascending: false })
-  
-  if (error) {
-    console.error('Error fetching picks by AI:', error)
+export async function getStockPicksByAI(aiName: string): Promise<StockPick[]> {
+  try {
+    // First get the AI model ID
+    const { data: aiModel } = await supabase
+      .from('ai_models')
+      .select('id')
+      .or(`name.eq.${aiName},display_name.eq.${aiName}`)
+      .single()
+    
+    if (!aiModel) return []
+    
+    const { data, error } = await supabase
+      .from('stock_picks')
+      .select(`*, ai_models (name, display_name, color)`)
+      .eq('ai_model_id', aiModel.id)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching picks by AI:', error)
+      return []
+    }
+    
+    return (data || []).map(mapPickToFrontend)
+  } catch (e) {
+    console.error('Exception:', e)
     return []
   }
-  
-  return (data || []).map(pick => ({
-    ...pick,
-    ai_name: pick.ai_models?.display_name || aiName,
-    symbol: pick.ticker,
-    confidence_score: pick.confidence,
-  }))
 }
 
-// Fetch stock picks with optional filters
-export async function getStockPicks(filters?: { symbol?: string; aiName?: string; status?: string }) {
-  let query = supabase
-    .from('stock_picks')
-    .select(`*, ai_models (name, display_name, color)`)
-  
-  if (filters?.symbol) {
-    query = query.eq('ticker', filters.symbol.toUpperCase())
-  }
-  
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
-  }
-  
-  query = query.order('created_at', { ascending: false })
-  
-  const { data, error } = await query
-  
-  if (error) {
-    console.error('Error fetching picks:', error)
+// Fetch stock picks with filters
+export async function getStockPicks(filters?: { symbol?: string; aiName?: string; status?: string }): Promise<StockPick[]> {
+  try {
+    let query = supabase
+      .from('stock_picks')
+      .select(`*, ai_models (name, display_name, color)`)
+    
+    if (filters?.symbol) {
+      query = query.eq('ticker', filters.symbol.toUpperCase())
+    }
+    
+    if (filters?.status) {
+      const dbStatus = filters.status === 'OPEN' ? 'active' : filters.status.toLowerCase()
+      query = query.eq('status', dbStatus)
+    }
+    
+    query = query.order('created_at', { ascending: false })
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error fetching filtered picks:', error)
+      return []
+    }
+    
+    let result = (data || []).map(mapPickToFrontend)
+    
+    // Filter by AI name if specified (client-side since we need display_name)
+    if (filters?.aiName) {
+      result = result.filter(p => 
+        p.ai_name.toLowerCase().includes(filters.aiName!.toLowerCase())
+      )
+    }
+    
+    return result
+  } catch (e) {
+    console.error('Exception:', e)
     return []
   }
-  
-  let result = (data || []).map(pick => ({
-    ...pick,
-    ai_name: pick.ai_models?.display_name || 'Unknown',
-    symbol: pick.ticker,
-    confidence_score: pick.confidence,
-  }))
-  
-  // Filter by AI name if specified
-  if (filters?.aiName) {
-    result = result.filter(p => p.ai_name.toLowerCase().includes(filters.aiName!.toLowerCase()))
-  }
-  
-  return result
 }
 
 // Fetch AI models
-export async function getAIModels() {
-  const { data, error } = await supabase
-    .from('ai_models')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_name')
-  
-  if (error) {
-    console.error('Error fetching AI models:', error)
-    return []
-  }
-  
-  return data as AIModel[]
-}
-
-// Get hot picks (consensus picks)
-export async function getHotPicks() {
-  const picks = await getAllStockPicks()
-  
-  // Group by ticker
-  const tickerMap = new Map<string, typeof picks>()
-  picks.forEach(pick => {
-    const ticker = pick.ticker || pick.symbol
-    if (!tickerMap.has(ticker)) {
-      tickerMap.set(ticker, [])
+export async function getAIModels(): Promise<AIModel[]> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_models')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_name')
+    
+    if (error) {
+      console.error('Error fetching AI models:', error)
+      return []
     }
-    tickerMap.get(ticker)!.push(pick)
-  })
-  
-  // Find stocks picked by 2+ AIs
-  const hotPicks = Array.from(tickerMap.entries())
-    .filter(([_, picks]) => picks.length >= 2)
-    .map(([ticker, picks]) => ({
-      symbol: ticker,
-      ticker,
-      picks,
-      consensus: picks.length,
-      avgConfidence: picks.reduce((sum, p) => sum + (p.confidence || p.confidence_score || 0), 0) / picks.length,
-      aiNames: picks.map(p => p.ai_name)
+    
+    return (data || []).map(row => ({
+      id: row.id,
+      ai_name: row.name,
+      display_name: row.display_name,
+      provider: row.provider,
+      is_active: row.is_active,
+      color_primary: row.color || '#6366f1',
+      color_secondary: row.color || '#818cf8',
     }))
-    .sort((a, b) => b.consensus - a.consensus)
-  
-  return hotPicks
-}
-
-// Calculate AI statistics
-export async function getAIStatistics() {
-  const { data: aiModels, error } = await supabase
-    .from('ai_models')
-    .select('*')
-    .eq('is_active', true)
-  
-  if (error) {
-    console.error('Error fetching AI stats:', error)
+  } catch (e) {
+    console.error('Exception:', e)
     return []
   }
-  
-  return (aiModels || []).map(ai => ({
-    aiName: ai.display_name || ai.name,
-    totalPicks: ai.total_picks || 0,
-    avgConfidence: 75, // Default
-    openPicks: 0,
-    closedPicks: ai.total_wins + ai.total_losses,
-    winRate: ai.win_rate || 0,
-    totalWins: ai.total_wins || 0,
-    totalLosses: ai.total_losses || 0,
-    color: ai.color,
-  }))
+}
+
+// Get hot picks (consensus - stocks picked by multiple AIs)
+export async function getHotPicks(): Promise<any[]> {
+  try {
+    const picks = await getAllStockPicks()
+    
+    // Group by symbol
+    const symbolMap = new Map<string, StockPick[]>()
+    picks.forEach(pick => {
+      const sym = pick.symbol
+      if (!sym) return
+      if (!symbolMap.has(sym)) {
+        symbolMap.set(sym, [])
+      }
+      symbolMap.get(sym)!.push(pick)
+    })
+    
+    // Find stocks picked by 2+ AIs
+    const hotPicks = Array.from(symbolMap.entries())
+      .filter(([_, picks]) => picks.length >= 2)
+      .map(([symbol, picks]) => ({
+        symbol,
+        picks,
+        consensus: picks.length,
+        avgConfidence: picks.reduce((sum, p) => sum + (p.confidence_score || 0), 0) / picks.length,
+        aiNames: picks.map(p => p.ai_name),
+      }))
+      .sort((a, b) => b.consensus - a.consensus)
+    
+    return hotPicks
+  } catch (e) {
+    console.error('Exception:', e)
+    return []
+  }
+}
+
+// Get AI statistics
+export async function getAIStatistics(): Promise<any[]> {
+  try {
+    const { data: aiModels, error } = await supabase
+      .from('ai_models')
+      .select('*')
+      .eq('is_active', true)
+    
+    if (error) {
+      console.error('Error fetching AI stats:', error)
+      return []
+    }
+    
+    return (aiModels || []).map(ai => ({
+      aiName: ai.display_name || ai.name,
+      totalPicks: ai.total_picks || 0,
+      avgConfidence: 75,
+      openPicks: 0,
+      closedPicks: (ai.total_wins || 0) + (ai.total_losses || 0),
+      winRate: ai.win_rate || 0,
+      totalWins: ai.total_wins || 0,
+      totalLosses: ai.total_losses || 0,
+      color: ai.color || '#6366f1',
+    }))
+  } catch (e) {
+    console.error('Exception:', e)
+    return []
+  }
 }
