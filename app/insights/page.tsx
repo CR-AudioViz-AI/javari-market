@@ -63,9 +63,9 @@ export default function InsightsPage() {
       ...filteredPicks.map(p => [
         p.ai_name,
         p.symbol,
-        p.entry_price,
-        p.target_price,
-        p.confidence_score,
+        (p.entry_price || 0),
+        (p.target_price || 0),
+        (p.confidence_score || 0),
         formatDate(p.created_at),
         `"${p.reasoning.replace(/"/g, '""')}"`
       ].join(','))
@@ -163,7 +163,7 @@ export default function InsightsPage() {
             <tbody>
               {filteredPicks.map(pick => {
                 const colors = getAIColor(pick.ai_name || 'Unknown')
-                const gain = calculateGainPercentage((pick.entry_price || 0), (pick.target_price || 0))
+                const gain = calculateGainPercentage(((pick.entry_price || 0) || 0), ((pick.target_price || 0) || 0))
                 
                 return (
                   <tr key={pick.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
@@ -174,8 +174,8 @@ export default function InsightsPage() {
                       </div>
                     </td>
                     <td className="p-4 font-bold">{pick.symbol}</td>
-                    <td className="p-4">{formatCurrency(pick.entry_price)}</td>
-                    <td className="p-4 text-green-400">{formatCurrency(pick.target_price)}</td>
+                    <td className="p-4">{formatCurrency((pick.entry_price || 0))}</td>
+                    <td className="p-4 text-green-400">{formatCurrency((pick.target_price || 0))}</td>
                     <td className="p-4">
                       <span className={gain >= 0 ? 'text-green-400' : 'text-red-400'}>
                         {formatPercentage(gain)}
@@ -186,10 +186,10 @@ export default function InsightsPage() {
                         <div className="w-20 bg-slate-700 rounded-full h-2">
                           <div
                             className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full"
-                            style={{ width: `${pick.confidence_score}%` }}
+                            style={{ width: `${(pick.confidence_score || 0)}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm">{pick.confidence_score}%</span>
+                        <span className="text-sm">{(pick.confidence_score || 0)}%</span>
                       </div>
                     </td>
                     <td className="p-4 text-slate-400 text-sm">{formatDate(pick.created_at)}</td>
