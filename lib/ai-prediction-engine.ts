@@ -153,15 +153,15 @@ async function getClaudePicks(prompt: string): Promise<AIResponse> {
   }
 }
 
-// Gemini - FIXED: Use gemini-pro model
+// Gemini - FIXED: Use gemini-1.5-flash model
 async function getGeminiPicks(prompt: string): Promise<AIResponse> {
   try {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-    // Use gemini-pro which is widely available
+    // Use gemini-1.5-flash which is widely available
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
