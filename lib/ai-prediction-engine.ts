@@ -1,17 +1,14 @@
 /**
  * MARKET ORACLE - AI PREDICTION ENGINE
- * Bulletproof version - November 24, 2025 - 5:22 AM ET
+ * Fixed model names - November 24, 2025 - 5:42 AM ET
  */
 
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase with service role for server-side operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
-
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Types
 interface StockPick {
   ticker: string;
   direction: 'UP' | 'DOWN' | 'HOLD';
@@ -30,7 +27,6 @@ interface AIResponse {
   error?: string;
 }
 
-// Analysis prompt
 function getAnalysisPrompt(currentDate: string): string {
   return `You are a professional stock market analyst. Pick 5-7 stocks for the week.
 
@@ -63,22 +59,16 @@ RESPOND IN VALID JSON ONLY:
 Only output valid JSON.`;
 }
 
-// Parse JSON response (handles markdown code blocks)
 function parseAIResponse(text: string): { picks: StockPick[] } | null {
   try {
-    // Remove markdown code blocks if present
-    const cleaned = text
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(cleaned);
   } catch {
-    console.error('Failed to parse AI response');
     return null;
   }
 }
 
-// GPT-4 Prediction
+// GPT-4
 async function getGPT4Picks(prompt: string): Promise<AIResponse> {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -102,7 +92,6 @@ async function getGPT4Picks(prompt: string): Promise<AIResponse> {
     });
 
     if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
-
     const data = await response.json();
     const parsed = parseAIResponse(data.choices?.[0]?.message?.content || '');
 
@@ -111,7 +100,6 @@ async function getGPT4Picks(prompt: string): Promise<AIResponse> {
       picks: parsed?.picks || [],
       timestamp: new Date().toISOString(),
       success: !!parsed?.picks?.length,
-      error: parsed ? undefined : 'Failed to parse response',
     };
   } catch (error) {
     return {
@@ -124,7 +112,7 @@ async function getGPT4Picks(prompt: string): Promise<AIResponse> {
   }
 }
 
-// Claude Prediction
+// Claude
 async function getClaudePicks(prompt: string): Promise<AIResponse> {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -145,17 +133,14 @@ async function getClaudePicks(prompt: string): Promise<AIResponse> {
     });
 
     if (!response.ok) throw new Error(`Anthropic API error: ${response.status}`);
-
     const data = await response.json();
-    const text = data.content?.[0]?.text || '';
-    const parsed = parseAIResponse(text);
+    const parsed = parseAIResponse(data.content?.[0]?.text || '');
 
     return {
       aiModel: 'Claude',
       picks: parsed?.picks || [],
       timestamp: new Date().toISOString(),
       success: !!parsed?.picks?.length,
-      error: parsed ? undefined : 'Failed to parse response',
     };
   } catch (error) {
     return {
@@ -168,14 +153,15 @@ async function getClaudePicks(prompt: string): Promise<AIResponse> {
   }
 }
 
-// Gemini Prediction
+// Gemini - FIXED: Use gemini-pro model
 async function getGeminiPicks(prompt: string): Promise<AIResponse> {
   try {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
+    // Use gemini-pro which is widely available
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,7 +172,10 @@ async function getGeminiPicks(prompt: string): Promise<AIResponse> {
       }
     );
 
-    if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${errorText.slice(0, 100)}`);
+    }
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -197,7 +186,6 @@ async function getGeminiPicks(prompt: string): Promise<AIResponse> {
       picks: parsed?.picks || [],
       timestamp: new Date().toISOString(),
       success: !!parsed?.picks?.length,
-      error: parsed ? undefined : 'Failed to parse response',
     };
   } catch (error) {
     return {
@@ -210,7 +198,7 @@ async function getGeminiPicks(prompt: string): Promise<AIResponse> {
   }
 }
 
-// Perplexity Prediction
+// Perplexity - FIXED: Proper request format
 async function getPerplexityPicks(prompt: string): Promise<AIResponse> {
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
@@ -223,17 +211,19 @@ async function getPerplexityPicks(prompt: string): Promise<AIResponse> {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-sonar-large-128k-online',
+        model: 'sonar', // Simplified model name
         messages: [
           { role: 'system', content: 'You are an expert stock analyst with real-time web access. Always respond with valid JSON only.' },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.7,
         max_tokens: 2000,
       }),
     });
 
-    if (!response.ok) throw new Error(`Perplexity API error: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Perplexity API error: ${response.status} - ${errorText.slice(0, 100)}`);
+    }
 
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || '';
@@ -244,7 +234,6 @@ async function getPerplexityPicks(prompt: string): Promise<AIResponse> {
       picks: parsed?.picks || [],
       timestamp: new Date().toISOString(),
       success: !!parsed?.picks?.length,
-      error: parsed ? undefined : 'Failed to parse response',
     };
   } catch (error) {
     return {
@@ -257,17 +246,12 @@ async function getPerplexityPicks(prompt: string): Promise<AIResponse> {
   }
 }
 
-// Javari Prediction (uses Claude as fallback)
+// Javari (uses Claude)
 async function getJavariPicks(prompt: string): Promise<AIResponse> {
-  // Javari learns from others - for now uses Claude
   const result = await getClaudePicks(prompt);
-  return {
-    ...result,
-    aiModel: 'Javari',
-  };
+  return { ...result, aiModel: 'Javari' };
 }
 
-// Generate all predictions
 export async function generateAllPredictions(): Promise<AIResponse[]> {
   const currentDate = new Date().toISOString().split('T')[0];
   const prompt = getAnalysisPrompt(currentDate);
@@ -286,7 +270,6 @@ export async function generateAllPredictions(): Promise<AIResponse[]> {
   return results;
 }
 
-// Save predictions to database
 export async function savePredictionsToDatabase(
   predictions: AIResponse[],
   competitionId: string,
@@ -294,7 +277,6 @@ export async function savePredictionsToDatabase(
 ): Promise<void> {
   const pickDate = new Date().toISOString().split('T')[0];
   
-  // Calculate expiry (Friday of current week)
   const today = new Date();
   const dayOfWeek = today.getDay();
   const daysUntilFriday = dayOfWeek <= 5 ? 5 - dayOfWeek : 5 + (7 - dayOfWeek);
@@ -307,7 +289,6 @@ export async function savePredictionsToDatabase(
       continue;
     }
 
-    // Get AI model ID
     const { data: aiModel } = await supabase
       .from('ai_models')
       .select('id')
@@ -319,7 +300,6 @@ export async function savePredictionsToDatabase(
       continue;
     }
 
-    // Save each pick
     for (const pick of prediction.picks) {
       const { error } = await supabase.from('stock_picks').insert({
         competition_id: competitionId,
@@ -337,29 +317,22 @@ export async function savePredictionsToDatabase(
         status: 'active',
       });
 
-      if (error) {
-        console.error(`Error saving pick for ${prediction.aiModel}:`, error.message);
-      }
+      if (error) console.error(`Error saving pick for ${prediction.aiModel}:`, error.message);
     }
 
     console.log(`✅ Saved ${prediction.picks.length} picks for ${prediction.aiModel}`);
   }
 }
 
-// Get or create active competition
 export async function getOrCreateActiveCompetition() {
-  // Check for active competition
   const { data: activeCompetition } = await supabase
     .from('competitions')
     .select('*')
     .eq('status', 'active')
     .single();
 
-  if (activeCompetition) {
-    return activeCompetition;
-  }
+  if (activeCompetition) return activeCompetition;
 
-  // Create new 90-day competition
   const today = new Date();
   const endDate = new Date(today);
   endDate.setDate(endDate.getDate() + 90);
@@ -387,7 +360,6 @@ export async function getOrCreateActiveCompetition() {
   return newCompetition;
 }
 
-// Calculate week number
 export function calculateWeekNumber(startDate: string): number {
   const start = new Date(startDate);
   const today = new Date();
