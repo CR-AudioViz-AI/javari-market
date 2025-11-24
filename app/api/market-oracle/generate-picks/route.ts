@@ -1,30 +1,26 @@
 /**
- * MARKET ORACLE - WEEKLY PICKS GENERATION API
- * Triggered every Monday at 6 AM to generate new picks
- * November 24, 2025 - 4:50 AM ET
+ * MARKET ORACLE - GENERATE PICKS API
+ * November 24, 2025 - 5:24 AM ET
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { generateAllPredictions, savePredictionsToDatabase } from '@/lib/ai-prediction-engine';
+import {
+  generateAllPredictions,
+  savePredictionsToDatabase,
+  getOrCreateActiveCompetition,
+  calculateWeekNumber,
+} from '@/lib/ai-prediction-engine';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// Add force-dynamic to prevent static generation
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow up to 60 seconds for AI calls
 
-/**
- * POST /api/market-oracle/generate-picks
- * Generate weekly stock picks from all 5 AIs
- */
 export async function POST(request: NextRequest) {
   try {
-    // Verify cron secret
+    // Verify cron secret for automated calls
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const cronSecret = process.env.CRON_SECRET;
+    
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -54,10 +50,7 @@ export async function POST(request: NextRequest) {
     // Save to database
     await savePredictionsToDatabase(predictions, competition.id, weekNumber);
 
-    // Update AI model statistics
-    await updateAIStatistics(predictions);
-
-    // Send summary
+    // Build summary
     const summary = predictions.map(p => ({
       aiModel: p.aiModel,
       success: p.success,
@@ -65,7 +58,10 @@ export async function POST(request: NextRequest) {
       error: p.error,
     }));
 
-    console.log('✅ Weekly picks generation complete!');
+    const successCount = predictions.filter(p => p.success).length;
+    const totalPicks = predictions.reduce((sum, p) => sum + p.picks.length, 0);
+
+    console.log(`✅ Generated ${totalPicks} picks from ${successCount}/5 AIs`);
 
     return NextResponse.json({
       success: true,
@@ -73,6 +69,11 @@ export async function POST(request: NextRequest) {
         id: competition.id,
         name: competition.name,
         week: weekNumber,
+      },
+      summary: {
+        totalPicks,
+        successfulAIs: successCount,
+        failedAIs: 5 - successCount,
       },
       predictions: summary,
       timestamp: new Date().toISOString(),
@@ -90,51 +91,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * GET /api/market-oracle/generate-picks?manual=true
- * Manual trigger (for testing)
- */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const manual = searchParams.get('manual');
+    const trigger = searchParams.get('trigger');
 
-    if (manual !== 'true') {
-      return NextResponse.json(
-        { success: false, error: 'Use POST with cron secret' },
-        { status: 400 }
-      );
+    // Allow manual trigger for testing
+    if (trigger === 'manual') {
+      return POST(request);
     }
-
-    // Get active competition
-    const { data: competition } = await supabase
-      .from('competitions')
-      .select('*')
-      .eq('status', 'active')
-      .single();
-
-    if (!competition) {
-      return NextResponse.json(
-        { success: false, error: 'No active competition' },
-        { status: 404 }
-      );
-    }
-
-    const weekNumber = calculateWeekNumber(competition.start_date);
 
     return NextResponse.json({
       success: true,
-      message: 'Use POST /api/market-oracle/generate-picks with cron secret',
-      competition: {
-        id: competition.id,
-        name: competition.name,
-        week: weekNumber,
-        status: competition.status,
+      message: 'Weekly Picks Generator API',
+      usage: {
+        post: 'POST with Authorization: Bearer {CRON_SECRET}',
+        manualTrigger: 'GET ?trigger=manual',
       },
+      schedule: 'Every Monday at 6 AM ET',
     });
 
   } catch (error) {
-    console.error('Get picks info error:', error);
+    console.error('API info error:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -142,70 +120,5 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// HELPER FUNCTIONS
-// ═══════════════════════════════════════════════════════════════
-
-async function getOrCreateActiveCompetition() {
-  // Check for active competition
-  const { data: activeCompetition } = await supabase
-    .from('competitions')
-    .select('*')
-    .eq('status', 'active')
-    .single();
-
-  if (activeCompetition) {
-    return activeCompetition;
-  }
-
-  // Create new competition (90 days)
-  const today = new Date();
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + 90);
-
-  const competitionName = `Q${Math.ceil((today.getMonth() + 1) / 3)} ${today.getFullYear()} Competition`;
-
-  const { data: newCompetition, error } = await supabase
-    .from('competitions')
-    .insert({
-      name: competitionName,
-      start_date: today.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0],
-      status: 'active',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating competition:', error);
-    return null;
-  }
-
-  console.log(`✅ Created new competition: ${competitionName}`);
-  return newCompetition;
-}
-
-function calculateWeekNumber(startDate: string): number {
-  const start = new Date(startDate);
-  const today = new Date();
-  const diffTime = Math.abs(today.getTime() - start.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return Math.ceil(diffDays / 7);
-}
-
-async function updateAIStatistics(predictions: any[]) {
-  for (const prediction of predictions) {
-    if (!prediction.success) continue;
-
-    await supabase
-      .from('ai_models')
-      .update({
-        total_picks: supabase.raw('total_picks + ?', [prediction.picks.length]),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('name', prediction.aiModel);
   }
 }
