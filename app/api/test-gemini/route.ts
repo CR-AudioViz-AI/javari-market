@@ -4,37 +4,37 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const apiKey = process.env.GEMINI_API_KEY;
-  
-  // Try multiple model names
-  const models = ['gemini-pro', 'gemini-1.5-flash', 'gemini-1.0-pro'];
   const results = [];
   
-  for (const model of models) {
+  // Try v1 and v1beta with different models
+  const tests = [
+    { version: 'v1beta', model: 'gemini-pro' },
+    { version: 'v1', model: 'gemini-pro' },
+    { version: 'v1beta', model: 'gemini-1.5-flash' },
+    { version: 'v1', model: 'gemini-1.5-flash' },
+  ];
+  
+  for (const test of tests) {
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: 'Say hi' }] }],
-          }),
-        }
-      );
+      const url = `https://generativelanguage.googleapis.com/${test.version}/models/${test.model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'Hi' }] }] }),
+      });
       
-      const status = response.status;
       const data = await response.json().catch(() => ({}));
-      
       results.push({
-        model,
-        status,
-        works: status === 200,
-        error: data.error?.message?.slice(0, 50) || null,
+        version: test.version,
+        model: test.model,
+        status: response.status,
+        works: response.status === 200,
+        response: data.candidates ? 'SUCCESS' : data.error?.message?.slice(0, 60),
       });
     } catch (e) {
-      results.push({ model, status: 'error', works: false, error: String(e).slice(0, 50) });
+      results.push({ version: test.version, model: test.model, status: 'error', works: false });
     }
   }
   
-  return NextResponse.json({ apiKey: apiKey?.slice(0, 10) + '...', results });
+  return NextResponse.json({ results });
 }
