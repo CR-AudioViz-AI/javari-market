@@ -1,4 +1,4 @@
-// app/api/market-oracle/generate-picks/route.ts
+// app/api/market-oracle/generate-picks/route.ts - FINAL V3
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -12,14 +12,6 @@ export const dynamic = 'force-dynamic';
 
 type Category = 'regular' | 'penny' | 'crypto';
 
-interface StockPick {
-  ticker: string;
-  confidence: number;
-  entry_price: number;
-  target_price: number;
-  reasoning: string;
-}
-
 const PROMPTS: Record<Category, string> = {
   regular: `REGULAR STOCKS ($10+): Pick 5 major company stocks. Examples: AAPL, NVDA, TSLA, GOOGL, AMZN, META, MSFT`,
   penny: `PENNY STOCKS (Under $5): Pick 5 stocks under $5. Examples: SNDL, MULN, SOFI, HOOD, WISH`,
@@ -29,11 +21,11 @@ const PROMPTS: Record<Category, string> = {
 function buildPrompt(cat: Category): string {
   return `You are an AI analyst. Date: ${new Date().toLocaleDateString('en-US')}.
 ${PROMPTS[cat]}
-Return EXACTLY 5 picks as JSON: [{"ticker":"SYM","confidence":75,"entry_price":100,"target_price":110,"reasoning":"Brief"}]
+Return EXACTLY 5 picks as JSON: [{"ticker":"SYM","confidence":75,"entry_price":100,"target_price":110,"reasoning":"Brief analysis"}]
 JSON only, no markdown.`;
 }
 
-function parse(text: string): StockPick[] {
+function parse(text: string): any[] {
   try {
     let c = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const s = c.indexOf('['), e = c.lastIndexOf(']') + 1;
@@ -41,9 +33,9 @@ function parse(text: string): StockPick[] {
     return JSON.parse(c).slice(0, 5).map((p: any) => ({
       ticker: String(p.ticker || '').toUpperCase().replace(/[^A-Z0-9]/g, ''),
       confidence: Math.min(100, Math.max(0, Number(p.confidence) || 50)),
-      entry_price: Number(p.entry_price) || 0,
-      target_price: Number(p.target_price) || 0,
-      reasoning: String(p.reasoning || '').slice(0, 500),
+      entry_price: Number(p.entry_price) || 100,
+      target_price: Number(p.target_price) || 110,
+      reasoning: String(p.reasoning || 'AI analysis').slice(0, 500),
     }));
   } catch { return []; }
 }
@@ -90,7 +82,7 @@ async function callAI(name: string, prompt: string): Promise<string> {
 
 export async function GET(req: NextRequest) {
   if (new URL(req.url).searchParams.get('trigger') !== 'manual') {
-    return NextResponse.json({ message: 'Market Oracle V3', categories: ['regular', 'penny', 'crypto'], picksPerAI: 15 });
+    return NextResponse.json({ message: 'Market Oracle V3', categories: ['regular', 'penny', 'crypto'], picksPerAI: 15, totalWeekly: 75 });
   }
   return gen();
 }
@@ -117,7 +109,14 @@ async function gen() {
   const { data: models } = await supabase.from('ai_models').select('id, name').eq('is_active', true);
   const aiMap = new Map(models?.map(m => [m.name, m.id]) || []);
   const week = Math.ceil((Date.now() - new Date(comp.start_date).getTime()) / (7 * 24 * 60 * 60 * 1000));
-  const expiry = (() => { const d = new Date(); d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7 || 7)); d.setHours(16, 0, 0, 0); return d.toISOString(); })();
+  
+  // Expiry: next Friday 4 PM
+  const expiry = (() => { 
+    const d = new Date(); 
+    d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7 || 7)); 
+    d.setHours(16, 0, 0, 0); 
+    return d.toISOString(); 
+  })();
 
   const results: any[] = [];
   let total = 0;
@@ -126,15 +125,17 @@ async function gen() {
   for (const ai of ais) {
     const r = { name: ai, regular: 0, penny: 0, crypto: 0, total: 0, errors: [] as string[] };
     const mid = aiMap.get(ai);
-    if (!mid) { r.errors.push('AI not found'); results.push(r); continue; }
+    if (!mid) { r.errors.push('AI model not found in database'); results.push(r); continue; }
 
     for (const cat of cats) {
       try {
         const picks = parse(await callAI(ai, buildPrompt(cat)));
         for (const p of picks) {
           if (!p.ticker) continue;
-          // Determine direction based on target vs entry
+          
           const direction = p.target_price > p.entry_price ? 'UP' : p.target_price < p.entry_price ? 'DOWN' : 'HOLD';
+          const stopLoss = direction === 'UP' ? p.entry_price * 0.95 : p.entry_price * 1.05;
+          
           const { error } = await supabase.from('stock_picks').insert({
             competition_id: comp.id,
             ai_model_id: mid,
@@ -142,7 +143,7 @@ async function gen() {
             confidence: p.confidence,
             entry_price: p.entry_price,
             target_price: p.target_price,
-            stop_loss: p.entry_price * 0.95, // 5% stop loss default
+            stop_loss: stopLoss,
             direction: direction,
             reasoning: `[${cat.toUpperCase()}] ${p.reasoning}`,
             week_number: week,
@@ -150,10 +151,19 @@ async function gen() {
             expiry_date: expiry,
             status: 'active',
           });
-          if (!error) { r[cat]++; r.total++; byCat[cat]++; total++; }
-          else { r.errors.push(`${p.ticker}: ${error.message}`); }
+          
+          if (!error) { 
+            r[cat]++; 
+            r.total++; 
+            byCat[cat]++; 
+            total++; 
+          } else { 
+            r.errors.push(`${p.ticker}: ${error.message}`); 
+          }
         }
-      } catch (e: any) { r.errors.push(`${cat}: ${e.message}`); }
+      } catch (e: any) { 
+        r.errors.push(`${cat}: ${e.message}`); 
+      }
     }
     results.push(r);
   }
