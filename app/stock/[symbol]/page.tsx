@@ -258,7 +258,7 @@ export default function StockDetailPage() {
                   <div className="flex items-center gap-3">
                     <div 
                       className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg"
-                      style={{ background: getAIColor(pick.ai_name || 'Unknown').primary }}
+                      style={{ background: getAIColor(String(pick.ai_name || 'Unknown')).primary }}
                     >
                       {((pick.ai_name || 'U')).charAt(0)}
                     </div>
