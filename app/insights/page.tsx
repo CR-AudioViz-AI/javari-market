@@ -162,8 +162,8 @@ export default function InsightsPage() {
             </thead>
             <tbody>
               {filteredPicks.map(pick => {
-                const colors = getAIColor(pick.ai_name)
-                const gain = calculateGainPercentage(pick.entry_price, pick.target_price)
+                const colors = getAIColor(pick.ai_name || 'Unknown')
+                const gain = calculateGainPercentage((pick.entry_price || 0), (pick.target_price || 0))
                 
                 return (
                   <tr key={pick.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
