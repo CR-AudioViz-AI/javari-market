@@ -37,21 +37,21 @@ export default function InsightsPage() {
 
     if (searchTerm) {
       filtered = filtered.filter(p => 
-        p.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.reasoning.toLowerCase().includes(searchTerm.toLowerCase())
+        (p.symbol || p.ticker || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.reasoning || "").toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
     if (selectedAI !== 'all') {
-      filtered = filtered.filter(p => p.ai_name.toLowerCase() === selectedAI)
+      filtered = filtered.filter(p => p.ai_name?.toLowerCase() === selectedAI)
     }
 
     if (sortBy === 'date') {
       filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     } else if (sortBy === 'confidence') {
-      filtered.sort((a, b) => b.confidence_score - a.confidence_score)
+      filtered.sort((a, b) => (b.confidence_score || 0) - a.confidence_score)
     } else if (sortBy === 'symbol') {
-      filtered.sort((a, b) => a.symbol.localeCompare(b.symbol))
+      filtered.sort((a, b) => (a.symbol || "").localeCompare((b.symbol || "")))
     }
 
     setFilteredPicks(filtered)
