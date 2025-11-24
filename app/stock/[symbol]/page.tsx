@@ -107,9 +107,9 @@ export default function StockDetailPage() {
   }
 
   const latestPick = picks[0]
-  const avgConfidence = picks.reduce((sum, p) => sum + p.confidence_score, 0) / picks.length
-  const avgTargetPrice = picks.reduce((sum, p) => sum + p.target_price, 0) / picks.length
-  const consensusBullish = picks.filter(p => p.target_price > p.entry_price).length > picks.length / 2
+  const avgConfidence = picks.reduce((sum, p) => sum + (p.confidence_score || 0), 0) / picks.length
+  const avgTargetPrice = picks.reduce((sum, p) => sum + (p.target_price || 0), 0) / picks.length
+  const consensusBullish = picks.filter(p => (p.target_price || 0) > (p.entry_price || 0)).length > picks.length / 2
   const uniqueAIs = new Set(picks.map(p => p.ai_name || 'Unknown')).size
 
   return (
@@ -249,7 +249,7 @@ export default function StockDetailPage() {
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {picks.map((pick) => {
-            const gainPercent = calculateGainPercentage(pick.entry_price, pick.target_price)
+            const gainPercent = calculateGainPercentage((pick.entry_price || 0), (pick.target_price || 0))
             
             return (
               <div key={pick.id} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 border border-slate-700 hover:border-brand-cyan/50 transition-all">
@@ -272,12 +272,12 @@ export default function StockDetailPage() {
                   </div>
                   
                   <div className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 ${
-                    pick.target_price > pick.entry_price 
+                    (pick.target_price || 0) > (pick.entry_price || 0) 
                       ? 'bg-green-500/20 text-green-500' 
                       : 'bg-red-500/20 text-red-500'
                   }`}>
-                    {pick.target_price > pick.entry_price ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {(pick.target_price > pick.entry_price ? 'BULLISH' : 'BEARISH')}
+                    {(pick.target_price || 0) > (pick.entry_price || 0) ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                    {((pick.target_price || 0) > (pick.entry_price || 0) ? 'BULLISH' : 'BEARISH')}
                   </div>
                 </div>
 
@@ -285,11 +285,11 @@ export default function StockDetailPage() {
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
                     <div className="text-xs text-slate-400 mb-1">Entry</div>
-                    <div className="font-bold text-brand-cyan">{formatCurrency(pick.entry_price)}</div>
+                    <div className="font-bold text-brand-cyan">{formatCurrency(pick.entry_price || 0)}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-400 mb-1">Target</div>
-                    <div className="font-bold text-green-500">{formatCurrency(pick.target_price)}</div>
+                    <div className="font-bold text-green-500">{formatCurrency(pick.target_price || 0)}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-400 mb-1">Upside</div>
@@ -301,16 +301,16 @@ export default function StockDetailPage() {
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                     <span>Confidence</span>
-                    <span className="font-bold text-white">{pick.confidence_score}%</span>
+                    <span className="font-bold text-white">{(pick.confidence_score || 0)}%</span>
                   </div>
                   <div className="w-full bg-slate-700 rounded-full h-2">
                     <div 
                       className={`h-full rounded-full transition-all ${
-                        pick.confidence_score >= 80 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
-                        pick.confidence_score >= 60 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
+                        (pick.confidence_score || 0) >= 80 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                        (pick.confidence_score || 0) >= 60 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
                         'bg-gradient-to-r from-red-500 to-pink-500'
                       }`}
-                      style={{ width: `${pick.confidence_score}%` }}
+                      style={{ width: `${(pick.confidence_score || 0)}%` }}
                     />
                   </div>
                 </div>
