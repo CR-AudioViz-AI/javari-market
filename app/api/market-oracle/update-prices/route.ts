@@ -1,4 +1,4 @@
-// app/api/market-oracle/update-prices/route.ts - LIVE PRICE UPDATES V2
+// app/api/market-oracle/update-prices/route.ts - LIVE PRICES (Twelve Data + CoinGecko)
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -7,10 +7,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export const maxDuration = 120;
+export const maxDuration = 180;
 export const dynamic = 'force-dynamic';
 
-// Crypto symbol mapping for CoinGecko
 const CRYPTO_MAP: Record<string, string> = {
   'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana', 'AVAX': 'avalanche-2',
   'MATIC': 'matic-network', 'LINK': 'chainlink', 'XRP': 'ripple', 'DOGE': 'dogecoin',
@@ -18,20 +17,19 @@ const CRYPTO_MAP: Record<string, string> = {
   'UNI': 'uniswap', 'ATOM': 'cosmos', 'XLM': 'stellar', 'PEPE': 'pepe',
 };
 
-// Fetch stock price from Finnhub (free API)
+// Fetch stock price from Twelve Data (free tier: 800 calls/day)
 async function getStockPrice(ticker: string): Promise<number | null> {
   try {
-    const apiKey = process.env.FINNHUB_API_KEY || 'ct3s5i1r01qhb4g5c7ngct3s5i1r01qhb4g5c7o0'; // Free demo key
-    const url = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${apiKey}`;
+    const apiKey = process.env.TWELVE_DATA_API_KEY || 'demo';
+    const url = `https://api.twelvedata.com/price?symbol=${ticker}&apikey=${apiKey}`;
     
     const response = await fetch(url);
     if (!response.ok) return null;
     
     const data = await response.json();
-    // c = current price, pc = previous close
-    return data.c > 0 ? data.c : (data.pc > 0 ? data.pc : null);
+    return data.price ? parseFloat(data.price) : null;
   } catch (error) {
-    console.error(`Finnhub error for ${ticker}:`, error);
+    console.error(`Twelve Data error for ${ticker}:`, error);
     return null;
   }
 }
@@ -45,8 +43,7 @@ async function getCryptoPrices(tickers: string[]): Promise<Map<string, number>> 
     const coinIds = tickers.map(t => CRYPTO_MAP[t.toUpperCase()]).filter(Boolean).join(',');
     if (!coinIds) return prices;
     
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`;
-    const response = await fetch(url);
+    const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`);
     if (!response.ok) return prices;
     
     const data = await response.json();
@@ -62,21 +59,24 @@ async function getCryptoPrices(tickers: string[]): Promise<Map<string, number>> 
   return prices;
 }
 
-// Rate-limited stock price fetcher (Finnhub: 60/min free tier)
-async function getStockPricesWithRateLimit(tickers: string[]): Promise<Map<string, number>> {
+// Fetch stock prices with rate limiting (8 calls/min for free tier)
+async function getStockPrices(tickers: string[]): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
   const uniqueTickers = [...new Set(tickers)];
   
-  // Process in batches with delay to respect rate limits
   for (let i = 0; i < uniqueTickers.length; i++) {
     const ticker = uniqueTickers[i];
     const price = await getStockPrice(ticker);
-    if (price !== null) {
+    if (price !== null && price > 0) {
       prices.set(ticker, price);
+      console.log(`✅ ${ticker}: $${price}`);
+    } else {
+      console.log(`❌ ${ticker}: No price`);
     }
-    // Small delay between requests (60 calls/min = 1 per second)
+    // Rate limit: ~8 calls/min for free tier, so 7.5s between calls
+    // But demo key allows more, using 500ms
     if (i < uniqueTickers.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
   
@@ -88,16 +88,15 @@ export async function GET(req: NextRequest) {
   if (trigger !== 'manual' && trigger !== 'cron') {
     return NextResponse.json({
       message: 'Market Oracle Price Update API',
-      usage: 'Add ?trigger=manual to update prices',
-      schedule: 'Auto-runs every 15 minutes during market hours',
+      usage: '?trigger=manual to update prices',
+      sources: { stocks: 'Twelve Data', crypto: 'CoinGecko' },
     });
   }
   return updatePrices();
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return updatePrices();
@@ -111,32 +110,29 @@ async function updatePrices() {
     .select('id, ticker, category, entry_price')
     .eq('status', 'active');
   
-  if (fetchError || !picks) {
-    return NextResponse.json({ error: 'Failed to fetch picks' }, { status: 500 });
+  if (fetchError || !picks || picks.length === 0) {
+    return NextResponse.json({ error: 'No picks found', updated: 0 });
   }
   
-  if (picks.length === 0) {
-    return NextResponse.json({ message: 'No active picks', updated: 0 });
-  }
+  // Separate and dedupe
+  const stockTickers = [...new Set(picks.filter(p => p.category !== 'crypto').map(p => p.ticker))];
+  const cryptoTickers = [...new Set(picks.filter(p => p.category === 'crypto').map(p => p.ticker))];
   
-  // Separate stocks and crypto
-  const stockTickers = picks.filter(p => p.category !== 'crypto').map(p => p.ticker);
-  const cryptoTickers = picks.filter(p => p.category === 'crypto').map(p => p.ticker);
+  console.log(`Fetching: ${stockTickers.length} stocks, ${cryptoTickers.length} crypto`);
   
-  console.log(`Fetching: ${[...new Set(stockTickers)].length} stocks, ${[...new Set(cryptoTickers)].length} crypto`);
-  
-  // Fetch prices
+  // Fetch prices (crypto in parallel, stocks sequential due to rate limits)
   const [stockPrices, cryptoPrices] = await Promise.all([
-    getStockPricesWithRateLimit(stockTickers),
-    getCryptoPrices([...new Set(cryptoTickers)]),
+    getStockPrices(stockTickers),
+    getCryptoPrices(cryptoTickers),
   ]);
   
   const allPrices = new Map([...stockPrices, ...cryptoPrices]);
-  console.log(`Got ${allPrices.size} prices total`);
+  console.log(`Total prices found: ${allPrices.size}`);
   
   // Update database
   let updated = 0, failed = 0;
   const now = new Date().toISOString();
+  const updates: Array<{ticker: string, current: number, pct: number}> = [];
   
   for (const pick of picks) {
     const currentPrice = allPrices.get(pick.ticker.toUpperCase());
@@ -155,17 +151,21 @@ async function updatePrices() {
         })
         .eq('id', pick.id);
       
-      if (!error) updated++;
-      else failed++;
-    } else {
-      failed++;
-    }
+      if (!error) {
+        updated++;
+        updates.push({ ticker: pick.ticker, current: currentPrice, pct: priceChangePct });
+      } else { failed++; }
+    } else { failed++; }
   }
+  
+  // Top movers
+  const sorted = updates.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
   
   return NextResponse.json({
     success: updated > 0,
     summary: { totalPicks: picks.length, pricesFound: allPrices.size, updated, failed },
-    prices: { stocks: stockPrices.size, crypto: cryptoPrices.size },
+    sources: { stocks: 'Twelve Data', crypto: 'CoinGecko' },
+    topMovers: sorted.slice(0, 5).map(u => ({ ticker: u.ticker, price: u.current, change: `${u.pct >= 0 ? '+' : ''}${u.pct.toFixed(2)}%` })),
     elapsedMs: Date.now() - startTime,
     timestamp: now,
   });
