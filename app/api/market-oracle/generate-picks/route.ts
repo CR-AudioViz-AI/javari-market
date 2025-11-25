@@ -1,4 +1,4 @@
-// app/api/market-oracle/generate-picks/route.ts - ENTERPRISE RELIABILITY
+// app/api/market-oracle/generate-picks/route.ts - BULLETPROOF GPT-4 FIX
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -77,11 +77,8 @@ async function callAIWithRetry(aiName: string, prompt: string, category: string)
   let lastError: any = null;
   const maxRetries = 3;
 
-  // Try primary model with retries
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`[${aiName}] Attempt ${attempt}/${maxRetries} - ${config.primary}`);
-      
       const response = await Promise.race([
         callAIProvider(aiName, prompt, config.primary, config.provider),
         new Promise<string>((_, reject) => 
@@ -89,23 +86,17 @@ async function callAIWithRetry(aiName: string, prompt: string, category: string)
         ),
       ]);
 
-      // Log success
       await logAICall(aiName, category, true, attempt, config.primary, false);
       return response;
     } catch (error: any) {
       lastError = error;
-      console.error(`[${aiName}] Attempt ${attempt} failed:`, error.message);
-      
-      // Exponential backoff before retry
       if (attempt < maxRetries) {
-        await sleep(1000 * Math.pow(2, attempt - 1)); // 1s, 2s, 4s
+        await sleep(1000 * Math.pow(2, attempt - 1));
       }
     }
   }
 
-  // Try fallback model if available
   if (config.fallback) {
-    console.log(`[${aiName}] Primary failed, trying fallback: ${config.fallback}`);
     try {
       const response = await Promise.race([
         callAIProvider(aiName, prompt, config.fallback, config.provider),
@@ -114,145 +105,70 @@ async function callAIWithRetry(aiName: string, prompt: string, category: string)
         ),
       ]);
 
-      // Log fallback success
       await logAICall(aiName, category, true, maxRetries + 1, config.fallback, true);
-      console.log(`[${aiName}] ✅ Fallback succeeded!`);
       return response;
     } catch (error: any) {
       lastError = error;
-      console.error(`[${aiName}] Fallback failed:`, error.message);
     }
   }
 
-  // All attempts failed
   await logAICall(aiName, category, false, maxRetries + (config.fallback ? 1 : 0), config.primary, false, lastError?.message);
   throw lastError || new Error('All attempts exhausted');
 }
 
-// Call AI Provider
 async function callAIProvider(aiName: string, prompt: string, model: string, provider: string): Promise<string> {
   if (provider === 'openai') {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000,
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 2000 }),
     });
-    if (!r.ok) {
-      const error = await r.text();
-      throw new Error(`OpenAI ${r.status}: ${error}`);
-    }
+    if (!r.ok) throw new Error(`OpenAI ${r.status}: ${await r.text()}`);
     return (await r.json()).choices[0].message.content;
   }
-
   if (provider === 'anthropic') {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
     });
-    if (!r.ok) {
-      const error = await r.text();
-      throw new Error(`Anthropic ${r.status}: ${error}`);
-    }
+    if (!r.ok) throw new Error(`Anthropic ${r.status}: ${await r.text()}`);
     return (await r.json()).content[0].text;
   }
-
   if (provider === 'google') {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      }
-    );
-    if (!r.ok) {
-      const error = await r.text();
-      throw new Error(`Google ${r.status}: ${error}`);
-    }
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    });
+    if (!r.ok) throw new Error(`Google ${r.status}: ${await r.text()}`);
     return (await r.json()).candidates[0].content.parts[0].text;
   }
-
   if (provider === 'perplexity') {
     const r = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000,
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 2000 }),
     });
-    if (!r.ok) {
-      const error = await r.text();
-      throw new Error(`Perplexity ${r.status}: ${error}`);
-    }
+    if (!r.ok) throw new Error(`Perplexity ${r.status}: ${await r.text()}`);
     return (await r.json()).choices[0].message.content;
   }
-
   throw new Error(`Unknown provider: ${provider}`);
 }
 
-// Log AI Call
-async function logAICall(
-  aiName: string,
-  category: string,
-  success: boolean,
-  attempts: number,
-  model: string,
-  usedFallback: boolean,
-  errorMessage?: string
-): Promise<void> {
+async function logAICall(aiName: string, category: string, success: boolean, attempts: number, model: string, usedFallback: boolean, errorMessage?: string): Promise<void> {
   try {
-    await supabase.from('ai_call_logs').insert({
-      ai_name: aiName,
-      category,
-      success,
-      attempts,
-      model_used: model,
-      used_fallback: usedFallback,
-      error_message: errorMessage,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error('Failed to log AI call:', error);
-  }
+    await supabase.from('ai_call_logs').insert({ ai_name: aiName, category, success, attempts, model_used: model, used_fallback: usedFallback, error_message: errorMessage, timestamp: new Date().toISOString() });
+  } catch (error) { console.error('Failed to log AI call:', error); }
 }
 
-// Sleep utility
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export async function GET(req: NextRequest) {
   if (new URL(req.url).searchParams.get('trigger') !== 'manual') {
-    return NextResponse.json({ 
-      message: 'Market Oracle V3 - Enterprise Reliability',
-      categories: ['regular', 'penny', 'crypto'],
-      picksPerAI: 15,
-      totalWeekly: 75,
-      reliability: '99.9% uptime with automatic fallbacks',
-    });
+    return NextResponse.json({ message: 'Market Oracle V3 - Enterprise Reliability', categories: ['regular', 'penny', 'crypto'], picksPerAI: 15, totalWeekly: 75, reliability: '99.9% uptime with automatic fallbacks' });
   }
   return gen();
 }
@@ -269,26 +185,32 @@ async function gen() {
   const cats: Category[] = ['regular', 'penny', 'crypto'];
   const ais = ['GPT-4', 'Claude', 'Gemini', 'Perplexity', 'Javari'];
 
-  console.log('🚀 Starting enterprise-grade pick generation...');
-
   let { data: comp } = await supabase.from('competitions').select('*').eq('status', 'active').single();
   if (!comp) {
-    const { data: nc } = await supabase.from('competitions')
-      .insert({ name: 'Q4 2025 AI Battle V3', status: 'active', start_date: new Date().toISOString() })
-      .select().single();
+    const { data: nc } = await supabase.from('competitions').insert({ name: 'Q4 2025 AI Battle V3', status: 'active', start_date: new Date().toISOString() }).select().single();
     comp = nc;
   }
 
+  // BULLETPROOF: Get AI models with explicit lookup
   const { data: models } = await supabase.from('ai_models').select('id, name').eq('is_active', true);
   const aiMap = new Map(models?.map(m => [m.name, m.id]) || []);
-  const week = Math.ceil((Date.now() - new Date(comp.start_date).getTime()) / (7 * 24 * 60 * 60 * 1000));
   
-  const expiry = (() => { 
-    const d = new Date(); 
-    d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7 || 7)); 
-    d.setHours(16, 0, 0, 0); 
-    return d.toISOString(); 
-  })();
+  // BULLETPROOF: Explicitly ensure GPT-4 ID is found
+  let gpt4Id = aiMap.get('GPT-4');
+  if (!gpt4Id) {
+    // Try case-insensitive search
+    const gpt4Model = models?.find(m => m.name.toUpperCase() === 'GPT-4' || m.name === 'gpt-4' || m.name === 'Gpt-4');
+    if (gpt4Model) {
+      gpt4Id = gpt4Model.id;
+      aiMap.set('GPT-4', gpt4Id); // Add to map
+      console.log(`✅ Found GPT-4 with alternate case: ${gpt4Model.name} -> ${gpt4Id}`);
+    } else {
+      console.error('❌ GPT-4 not found in database!');
+    }
+  }
+
+  const week = Math.ceil((Date.now() - new Date(comp.start_date).getTime()) / (7 * 24 * 60 * 60 * 1000));
+  const expiry = (() => { const d = new Date(); d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7 || 7)); d.setHours(16, 0, 0, 0); return d.toISOString(); })();
 
   const results: any[] = [];
   let total = 0;
@@ -297,20 +219,28 @@ async function gen() {
   for (const ai of ais) {
     const r = { name: ai, regular: 0, penny: 0, crypto: 0, total: 0, errors: [] as string[] };
     const mid = aiMap.get(ai);
+    
     if (!mid) { 
-      r.errors.push('AI model not found in database'); 
+      r.errors.push(`AI model ID not found. Available: ${Array.from(aiMap.keys()).join(', ')}`); 
       results.push(r); 
+      console.error(`❌ ${ai} not found in aiMap`);
       continue; 
     }
 
+    console.log(`✅ ${ai} -> ID: ${mid}`);
+
     for (const cat of cats) {
       try {
-        console.log(`[${ai}] Generating ${cat} picks...`);
         const response = await callAIWithRetry(ai, buildPrompt(cat), cat);
         const picks = parse(response);
         
+        console.log(`[${ai}] ${cat}: parsed ${picks.length} picks`);
+        
         for (const p of picks) {
-          if (!p.ticker) continue;
+          if (!p.ticker) {
+            console.log(`[${ai}] Skipping pick with no ticker`);
+            continue;
+          }
           
           const direction = p.target_price > p.entry_price ? 'UP' : p.target_price < p.entry_price ? 'DOWN' : 'HOLD';
           const stopLoss = direction === 'UP' ? p.entry_price * 0.95 : p.entry_price * 1.05;
@@ -337,8 +267,10 @@ async function gen() {
             r.total++; 
             byCat[cat]++; 
             total++; 
+            console.log(`[${ai}] ✅ Saved ${p.ticker}`);
           } else { 
             r.errors.push(`${p.ticker}: ${error.message}`); 
+            console.error(`[${ai}] ❌ Insert failed for ${p.ticker}:`, error.message);
           }
         }
       } catch (e: any) { 
@@ -351,19 +283,12 @@ async function gen() {
   }
 
   const elapsed = Date.now() - startTime;
-  console.log(`✅ Generation complete in ${(elapsed / 1000).toFixed(1)}s`);
-
   return NextResponse.json({
     success: total > 0,
     competition: { id: comp.id, name: comp.name, week },
     summary: { totalPicks: total, byCategory: byCat },
     results,
-    reliability: {
-      totalAIs: ais.length,
-      successfulAIs: results.filter(r => r.total > 0).length,
-      totalAttempts: results.reduce((sum, r) => sum + (r.total > 0 ? 1 : 0), 0),
-      elapsedSeconds: (elapsed / 1000).toFixed(1),
-    },
+    reliability: { totalAIs: ais.length, successfulAIs: results.filter(r => r.total > 0).length, totalAttempts: results.reduce((sum, r) => sum + (r.total > 0 ? 1 : 0), 0), elapsedSeconds: (elapsed / 1000).toFixed(1) },
     timestamp: new Date().toISOString(),
   });
 }
