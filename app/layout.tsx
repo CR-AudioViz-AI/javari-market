@@ -7,6 +7,7 @@ import {
   Home, TrendingUp, Trophy, BarChart3, Brain, BookOpen, 
   HelpCircle, Zap, MessageCircle, ExternalLink 
 } from 'lucide-react';
+import JavariWidget from '@/components/JavariWidget';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -67,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Main Navigation */}
-        <nav className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-50">
+        <nav className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-40">
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between h-16">
               {/* Logo */}
@@ -99,23 +100,40 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   title="Help Center">
                   <HelpCircle className="w-5 h-5" />
                 </Link>
-                <a href="https://craudiovizai.com/javari" target="_blank" rel="noopener noreferrer"
-                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg text-white font-medium hover:from-cyan-500 hover:to-blue-500 transition-all flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4" />
-                  Ask Javari
+                <a href="https://craudiovizai.com/pricing" target="_blank" rel="noopener noreferrer"
+                  className="hidden sm:flex px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg text-white font-medium hover:from-cyan-500 hover:to-blue-500 transition-all items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Upgrade
                 </a>
               </div>
             </div>
           </div>
         </nav>
 
+        {/* Mobile Navigation */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 z-40">
+          <div className="flex justify-around py-2">
+            {navItems.slice(0, 4).map(item => (
+              <Link key={item.href} href={item.href}
+                className="flex flex-col items-center gap-1 px-3 py-2 text-slate-400 hover:text-cyan-400">
+                <item.icon className="w-5 h-5" />
+                <span className="text-xs">{item.label}</span>
+              </Link>
+            ))}
+            <Link href="/help" className="flex flex-col items-center gap-1 px-3 py-2 text-slate-400 hover:text-cyan-400">
+              <HelpCircle className="w-5 h-5" />
+              <span className="text-xs">Help</span>
+            </Link>
+          </div>
+        </div>
+
         {/* Main Content */}
-        <main className="flex-1">
+        <main className="flex-1 pb-20 md:pb-0">
           {children}
         </main>
 
         {/* Footer - Cross Marketing */}
-        <footer className="bg-slate-900 border-t border-slate-800">
+        <footer className="bg-slate-900 border-t border-slate-800 hidden md:block">
           <div className="container mx-auto px-4 py-12">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {/* Brand */}
@@ -153,7 +171,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <li><Link href="/help" className="hover:text-cyan-400">Help Center</Link></li>
                   <li><Link href="/help/getting-started" className="hover:text-cyan-400">Getting Started</Link></li>
                   <li><Link href="/help/faq" className="hover:text-cyan-400">FAQ</Link></li>
-                  <li><a href="https://craudiovizai.com/support" className="hover:text-cyan-400">Contact Support</a></li>
+                  <li><a href="https://craudiovizai.com/support" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400">Contact Support</a></li>
                 </ul>
               </div>
 
@@ -191,13 +209,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </footer>
 
-        {/* Floating Help Button (Mobile) */}
-        <div className="fixed bottom-6 right-6 md:hidden z-50">
-          <Link href="/help"
-            className="w-14 h-14 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all">
-            <HelpCircle className="w-6 h-6 text-white" />
-          </Link>
-        </div>
+        {/* Javari AI Widget */}
+        <JavariWidget />
       </body>
     </html>
   );
