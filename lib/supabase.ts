@@ -313,6 +313,7 @@ function mapPick(row: any): StockPick {
     ...row,
     symbol: row.ticker,
     confidence_score: row.confidence,
+    price_change_percent: row.price_change_pct ?? row.price_change_percent ?? null,
     ai_name: row.ai_models?.display_name || row.ai_models?.name || 'Unknown',
     ai_color: row.ai_models?.color || '#6366f1',
   };
