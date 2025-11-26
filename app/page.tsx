@@ -365,10 +365,8 @@ function OverviewTab({ picks, stats, hotPicks, leaderboard }: any) {
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{pick.ticker}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    pick.direction === 'UP' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {pick.direction}
+                  <span className="text-xs px-2 py-0.5 rounded bg-gray-600/30 text-gray-400">
+                    Target {pick.direction === 'UP' ? '↑' : '↓'}
                   </span>
                 </div>
                 <div className="text-xs text-gray-400">
@@ -520,12 +518,8 @@ function PickCard({ pick }: { pick: StockPick }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-semibold">{pick.ai_name}</span>
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              pick.direction === 'UP' ? 'bg-green-500/20 text-green-400' :
-              pick.direction === 'DOWN' ? 'bg-red-500/20 text-red-400' :
-              'bg-gray-500/20 text-gray-400'
-            }`}>
-              {pick.direction}
+            <span className="text-xs px-2 py-0.5 rounded bg-gray-600/30 text-gray-400">
+              Target {pick.direction === 'UP' ? '↑' : pick.direction === 'DOWN' ? '↓' : '→'}
             </span>
             <span className="text-xs text-gray-400">{(pick.confidence || 0)}% confidence</span>
           </div>
@@ -811,10 +805,8 @@ function InsightsTab({ hotPicks, picks, stats }: { hotPicks: any[]; picks: Stock
             <div key={pick.ticker} className="bg-gray-800/50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-lg font-bold">{pick.ticker}</span>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  pick.direction === 'UP' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                }`}>
-                  {pick.direction}
+                <span className="px-2 py-1 rounded text-xs bg-gray-600/30 text-gray-400">
+                  Target {pick.direction === 'UP' ? '↑' : '↓'}
                 </span>
               </div>
               <div className="text-sm text-gray-400 mb-2">
