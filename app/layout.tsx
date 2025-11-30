@@ -1,4 +1,5 @@
 // app/layout.tsx - Market Oracle Enterprise Layout
+import Script from 'next/script';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -211,6 +212,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Javari AI Widget */}
         <JavariWidget />
+              {/* Javari AI Assistant */}
+        <Script src="https://javariai.com/embed.js" strategy="lazyOnload" />
       </body>
     </html>
   );
