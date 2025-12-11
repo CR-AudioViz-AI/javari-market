@@ -1,180 +1,316 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { 
-  TrendingUp, TrendingDown, Target, Trophy, Flame, Filter, 
-  BarChart3, PieChart, Coins, DollarSign, Bitcoin, Zap,
-  ChevronDown, ChevronUp, Star, Award, Medal, Crown,
-  Calendar, Download, RefreshCw, Search, X
+  TrendingUp, TrendingDown, Target, Trophy, Flame, 
+  BarChart3, Coins, DollarSign, Bitcoin, Zap,
+  ChevronDown, ChevronUp, Star, RefreshCw, Search, 
+  Filter, ArrowUpRight, ArrowDownRight, HelpCircle,
+  Brain, Eye, Clock, Percent
 } from 'lucide-react';
 import { 
-  getPicks, getAIModels, getAIStatistics, getHotPicks, getCategoryStats,
+  getPicks, getAIModels, getAIStatistics, getHotPicks, 
+  getOverallStats, getRecentWinners,
   type StockPick, type AIModel, type Category 
 } from '@/lib/supabase';
 
-// Category config
-const CATEGORIES = {
+// Category configuration
+const CATEGORIES: Record<Category | 'all', { name: string; icon: any; color: string }> = {
   all: { name: 'All Assets', icon: BarChart3, color: 'indigo' },
-  regular: { name: 'Regular Stocks', icon: DollarSign, color: 'blue' },
-  penny: { name: 'Penny Stocks', icon: Coins, color: 'green' },
+  regular: { name: 'Stocks', icon: DollarSign, color: 'blue' },
+  penny: { name: 'Penny Stocks', icon: Coins, color: 'emerald' },
   crypto: { name: 'Crypto', icon: Bitcoin, color: 'orange' },
 };
 
-const AI_COLORS: Record<string, string> = {
-  'GPT-4': '#10b981',
-  'Claude': '#f59e0b', 
-  'Gemini': '#3b82f6',
-  'Perplexity': '#8b5cf6',
-  'Javari': '#ef4444',
-};
+// Pick Card Component with Entry | Current (↑↓) | Target
+function PickCard({ pick }: { pick: StockPick }) {
+  const priceChange = pick.price_change_percent || 0;
+  const isUp = priceChange >= 0;
+  const hasCurrentPrice = pick.current_price !== null;
+  
+  // Calculate progress toward target
+  const progressToTarget = hasCurrentPrice && pick.target_price && pick.entry_price
+    ? Math.min(100, Math.max(0, ((pick.current_price! - pick.entry_price) / (pick.target_price - pick.entry_price)) * 100))
+    : 0;
 
+  return (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-all hover:shadow-lg group">
+      {/* Header: Ticker + AI + Confidence */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+            style={{ backgroundColor: pick.ai_color || '#6366f1' }}
+          >
+            {pick.ticker.slice(0, 2)}
+          </div>
+          <div>
+            <h3 className="font-bold text-white text-lg">{pick.ticker}</h3>
+            <p className="text-xs text-gray-400">{pick.ai_display_name}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className={`flex items-center gap-1 text-sm font-medium ${
+            isUp ? 'text-emerald-400' : 'text-red-400'
+          }`}>
+            {isUp ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+            {Math.abs(priceChange).toFixed(1)}%
+          </div>
+          <div className="text-xs text-gray-500">
+            {pick.confidence}% conf
+          </div>
+        </div>
+      </div>
+      
+      {/* Price Display: Entry | Current | Target */}
+      <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+        {/* Entry Price */}
+        <div className="bg-gray-900/50 rounded-lg py-2 px-1">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide">Entry</div>
+          <div className="text-sm font-semibold text-gray-300">
+            ${pick.entry_price?.toFixed(2) || '—'}
+          </div>
+        </div>
+        
+        {/* Current Price with Arrow */}
+        <div className={`rounded-lg py-2 px-1 ${
+          isUp ? 'bg-emerald-900/30 border border-emerald-800/50' : 'bg-red-900/30 border border-red-800/50'
+        }`}>
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide flex items-center justify-center gap-1">
+            Current
+            {isUp ? (
+              <TrendingUp className="w-3 h-3 text-emerald-400" />
+            ) : (
+              <TrendingDown className="w-3 h-3 text-red-400" />
+            )}
+          </div>
+          <div className={`text-sm font-bold ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+            ${hasCurrentPrice ? pick.current_price!.toFixed(2) : '—'}
+          </div>
+        </div>
+        
+        {/* Target Price */}
+        <div className="bg-gray-900/50 rounded-lg py-2 px-1">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide">Target</div>
+          <div className="text-sm font-semibold text-cyan-400">
+            ${pick.target_price?.toFixed(2) || '—'}
+          </div>
+        </div>
+      </div>
+      
+      {/* Progress to Target */}
+      <div className="mb-3">
+        <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+          <span>Progress to Target</span>
+          <span>{progressToTarget.toFixed(0)}%</span>
+        </div>
+        <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+          <div 
+            className={`h-full rounded-full transition-all ${
+              progressToTarget >= 100 ? 'bg-emerald-500' : 
+              progressToTarget >= 50 ? 'bg-cyan-500' : 
+              progressToTarget >= 0 ? 'bg-blue-500' : 'bg-red-500'
+            }`}
+            style={{ width: `${Math.max(0, progressToTarget)}%` }}
+          />
+        </div>
+      </div>
+      
+      {/* Direction + Status */}
+      <div className="flex items-center justify-between">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+          pick.direction === 'UP' 
+            ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/50'
+            : pick.direction === 'DOWN'
+            ? 'bg-red-900/50 text-red-400 border border-red-800/50'
+            : 'bg-gray-700 text-gray-400'
+        }`}>
+          {pick.direction === 'UP' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+          {pick.direction}
+        </span>
+        <span className={`px-2 py-0.5 rounded text-xs ${
+          pick.status === 'active' ? 'bg-yellow-900/50 text-yellow-400' :
+          pick.status === 'won' ? 'bg-emerald-900/50 text-emerald-400' :
+          pick.status === 'lost' ? 'bg-red-900/50 text-red-400' :
+          'bg-gray-700 text-gray-400'
+        }`}>
+          {pick.status?.toUpperCase() || 'ACTIVE'}
+        </span>
+      </div>
+      
+      {/* View Details Link */}
+      <Link 
+        href={`/stock/${pick.ticker}`}
+        className="mt-3 block text-center text-xs text-gray-400 hover:text-cyan-400 transition-colors"
+      >
+        View AI Reasoning →
+      </Link>
+    </div>
+  );
+}
+
+// AI Leaderboard Card
+function AILeaderboardCard({ ai, rank }: { ai: any; rank: number }) {
+  const medals = ['🥇', '🥈', '🥉'];
+  
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-lg ${
+      rank <= 3 ? 'bg-gradient-to-r from-yellow-900/20 to-transparent border border-yellow-800/30' : 'bg-gray-800/30'
+    }`}>
+      <div className="w-8 text-center">
+        {rank <= 3 ? (
+          <span className="text-xl">{medals[rank - 1]}</span>
+        ) : (
+          <span className="text-gray-500 font-bold">#{rank}</span>
+        )}
+      </div>
+      <div 
+        className="w-10 h-10 rounded-lg flex items-center justify-center"
+        style={{ backgroundColor: ai.color }}
+      >
+        <Brain className="w-5 h-5 text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-white truncate">{ai.displayName}</div>
+        <div className="text-xs text-gray-400">{ai.totalPicks} picks • {ai.winRate}% win rate</div>
+      </div>
+      <div className={`text-right ${ai.totalProfitLossPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <div className="font-bold flex items-center justify-end gap-1">
+          {ai.totalProfitLossPercent >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+          {ai.totalProfitLossPercent >= 0 ? '+' : ''}{ai.totalProfitLossPercent.toFixed(1)}%
+        </div>
+        <div className="text-xs text-gray-500">Total Return</div>
+      </div>
+    </div>
+  );
+}
+
+// Main Dashboard Component
 export default function DashboardPage() {
   // State
   const [picks, setPicks] = useState<StockPick[]>([]);
   const [aiModels, setAiModels] = useState<AIModel[]>([]);
-  const [stats, setStats] = useState<any[]>([]);
+  const [aiStats, setAiStats] = useState<any[]>([]);
   const [hotPicks, setHotPicks] = useState<any[]>([]);
-  const [categoryStats, setCategoryStats] = useState<any>({});
+  const [overallStats, setOverallStats] = useState<any>({});
+  const [recentWinners, setRecentWinners] = useState<StockPick[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   
   // Filters
-  const [category, setCategory] = useState<Category>('all');
+  const [category, setCategory] = useState<Category | 'all'>('all');
   const [selectedAI, setSelectedAI] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<string>('date');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sortBy, setSortBy] = useState<'date' | 'confidence' | 'change'>('date');
   
-  // View state
-  const [activeTab, setActiveTab] = useState<'overview' | 'picks' | 'leaderboard' | 'compare' | 'insights'>('overview');
-  const [showFilters, setShowFilters] = useState(false);
-  
-  // Load data
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 60000); // Refresh every minute
-    return () => clearInterval(interval);
-  }, [category]);
-  
-  async function loadData() {
+  // Load data function
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [picksData, modelsData, statsData, hotData, catStats] = await Promise.all([
+      const [picksData, modelsData, statsData, hotData, overallData, winnersData] = await Promise.all([
         getPicks({ category: category === 'all' ? undefined : category, limit: 500 }),
         getAIModels(),
         getAIStatistics(category === 'all' ? undefined : category),
         getHotPicks(category === 'all' ? undefined : category),
-        getCategoryStats(),
+        getOverallStats(),
+        getRecentWinners(5),
       ]);
       
       setPicks(picksData);
       setAiModels(modelsData);
-      setStats(statsData);
+      setAiStats(statsData);
       setHotPicks(hotData);
-      setCategoryStats(catStats);
+      setOverallStats(overallData);
+      setRecentWinners(winnersData);
+      setLastUpdate(new Date());
     } catch (e) {
       console.error('Load error:', e);
     }
     setLoading(false);
-  }
+  }, [category]);
   
-  // Filtered & sorted picks
+  // Initial load + auto-refresh
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [loadData]);
+  
+  // Filtered picks
   const filteredPicks = useMemo(() => {
     let result = [...picks];
     
     if (selectedAI !== 'all') {
-      result = result.filter(p => p.ai_name?.toLowerCase().includes(selectedAI.toLowerCase()));
+      result = result.filter(p => p.ai_model_id === selectedAI);
     }
-    if (statusFilter !== 'all') {
-      result = result.filter(p => p.status === statusFilter);
-    }
+    
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(p => 
         p.ticker.toLowerCase().includes(term) ||
-        p.reasoning?.toLowerCase().includes(term)
+        p.company_name?.toLowerCase().includes(term) ||
+        p.ai_display_name?.toLowerCase().includes(term)
       );
     }
     
     // Sort
     result.sort((a, b) => {
-      let cmp = 0;
       switch (sortBy) {
-        case 'date': cmp = new Date(b.created_at).getTime() - new Date(a.created_at).getTime(); break;
-        case 'confidence': cmp = (b.confidence || 0) - (a.confidence || 0); break;
-        case 'profit': cmp = (b.profit_loss || 0) - (a.profit_loss || 0); break;
-        case 'ticker': cmp = a.ticker.localeCompare(b.ticker); break;
+        case 'confidence':
+          return b.confidence - a.confidence;
+        case 'change':
+          return (b.price_change_percent || 0) - (a.price_change_percent || 0);
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
-      return sortDir === 'desc' ? cmp : -cmp;
     });
     
     return result;
-  }, [picks, selectedAI, statusFilter, searchTerm, sortBy, sortDir]);
-  
-  // Summary stats
-  const summary = useMemo(() => {
-    const total = filteredPicks.length;
-    const active = filteredPicks.filter(p => p.status === 'active').length;
-    const won = filteredPicks.filter(p => p.status === 'won').length;
-    const lost = filteredPicks.filter(p => p.status === 'lost').length;
-    const closed = won + lost;
-    const winRate = closed > 0 ? (won / closed) * 100 : 0;
-    const totalProfit = filteredPicks.reduce((s, p) => s + (p.profit_loss || 0), 0);
-    const avgConfidence = total > 0 
-      ? filteredPicks.reduce((s, p) => s + (p.confidence || 0), 0) / total 
-      : 0;
-    
-    return { total, active, won, lost, winRate, totalProfit, avgConfidence };
-  }, [filteredPicks]);
-  
-  // Leaderboard
-  const leaderboard = useMemo(() => {
-    return stats
-      .sort((a, b) => b.points - a.points)
-      .map((s, i) => ({ ...s, rank: i + 1 }));
-  }, [stats]);
-  
+  }, [picks, selectedAI, searchTerm, sortBy]);
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-lg border-b border-gray-800">
+      <header className="sticky top-16 z-30 bg-gray-900/95 backdrop-blur-lg border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Trophy className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold">Market Oracle</h1>
-                <p className="text-xs text-gray-400">AI Investment Battle</p>
-              </div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Title + Last Update */}
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Trophy className="w-6 h-6 text-yellow-400" />
+                AI Stock Battle
+              </h1>
+              <p className="text-sm text-gray-400 flex items-center gap-2">
+                <Clock className="w-3 h-3" />
+                {lastUpdate ? `Updated ${lastUpdate.toLocaleTimeString()}` : 'Loading...'}
+                {loading && <RefreshCw className="w-3 h-3 animate-spin" />}
+              </p>
             </div>
             
-            {/* Category Pills */}
-            <div className="flex gap-2">
-              {Object.entries(CATEGORIES).map(([key, cat]) => {
-                const Icon = cat.icon;
-                const isActive = category === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setCategory(key as Category)}
-                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all ${
-                      isActive 
-                        ? `bg-${cat.color}-500/20 text-${cat.color}-400 border border-${cat.color}-500/50` 
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {cat.name}
-                  </button>
-                );
-              })}
+            {/* Category Tabs */}
+            <div className="flex gap-2 flex-wrap">
+              {Object.entries(CATEGORIES).map(([key, { name, icon: Icon, color }]) => (
+                <button
+                  key={key}
+                  onClick={() => setCategory(key as Category | 'all')}
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all ${
+                    category === key
+                      ? `bg-${color}-500/20 text-${color}-400 border border-${color}-500/50`
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {name}
+                </button>
+              ))}
             </div>
             
-            <button 
+            {/* Refresh Button */}
+            <button
               onClick={loadData}
-              className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+              disabled={loading}
+              className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -182,657 +318,263 @@ export default function DashboardPage() {
         </div>
       </header>
       
-      {/* Tab Navigation */}
-      <nav className="bg-gray-900 border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-1">
-            {[
-              { id: 'overview', label: 'Overview', icon: BarChart3 },
-              { id: 'picks', label: 'All Picks', icon: Target },
-              { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
-              { id: 'compare', label: 'Compare AIs', icon: Zap },
-              { id: 'insights', label: 'Insights', icon: Flame },
-            ].map(tab => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-3 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-indigo-500 text-indigo-400'
-                      : 'border-transparent text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
-      
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-          <StatCard label="Total Picks" value={summary.total} icon={Target} />
-          <StatCard label="Active" value={summary.active} icon={Flame} color="yellow" />
-          <StatCard label="Winners" value={summary.won} icon={TrendingUp} color="green" />
-          <StatCard label="Losers" value={summary.lost} icon={TrendingDown} color="red" />
-          <StatCard label="Win Rate" value={`${summary.winRate.toFixed(1)}%`} icon={Trophy} color="purple" />
-          <StatCard label="Total P/L" value={`$${summary.totalProfit.toFixed(2)}`} icon={DollarSign} color={summary.totalProfit >= 0 ? 'green' : 'red'} />
-          <StatCard label="Avg Confidence" value={`${summary.avgConfidence.toFixed(0)}%`} icon={Star} color="indigo" />
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+          <StatCard 
+            icon={Target} 
+            label="Total Picks" 
+            value={overallStats.totalPicks || 0}
+            color="gray"
+          />
+          <StatCard 
+            icon={Flame} 
+            label="Active" 
+            value={overallStats.activePicks || 0}
+            color="yellow"
+          />
+          <StatCard 
+            icon={TrendingUp} 
+            label="Winners" 
+            value={overallStats.winners || 0}
+            color="emerald"
+          />
+          <StatCard 
+            icon={TrendingDown} 
+            label="Losers" 
+            value={overallStats.losers || 0}
+            color="red"
+          />
+          <StatCard 
+            icon={Trophy} 
+            label="Win Rate" 
+            value={`${overallStats.winRate || 0}%`}
+            color="purple"
+          />
+          <StatCard 
+            icon={DollarSign} 
+            label="Total P/L" 
+            value={`$${(overallStats.totalPL || 0).toFixed(0)}`}
+            color={overallStats.totalPL >= 0 ? 'emerald' : 'red'}
+          />
+          <StatCard 
+            icon={Star} 
+            label="Avg Conf" 
+            value={`${overallStats.avgConfidence || 0}%`}
+            color="indigo"
+          />
         </div>
         
-        {/* Category Stats */}
-        {category === 'all' && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            {Object.entries(categoryStats).map(([cat, data]: [string, any]) => (
-              <div key={cat} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                <div className="flex items-center gap-2 mb-2">
-                  {cat === 'regular' && <DollarSign className="w-5 h-5 text-blue-400" />}
-                  {cat === 'penny' && <Coins className="w-5 h-5 text-green-400" />}
-                  {cat === 'crypto' && <Bitcoin className="w-5 h-5 text-orange-400" />}
-                  <span className="font-semibold capitalize">{cat}</span>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* AI Leaderboard */}
+          <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-400" />
+              AI Leaderboard
+              <Link href="/battle" className="ml-auto text-xs text-cyan-400 hover:underline">
+                View Full →
+              </Link>
+            </h3>
+            <div className="space-y-2">
+              {aiStats.length > 0 ? (
+                aiStats.slice(0, 6).map((ai, i) => (
+                  <AILeaderboardCard key={ai.id} ai={ai} rank={i + 1} />
+                ))
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  {loading ? 'Loading...' : 'No AI data yet'}
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">{data.total} picks</span>
-                  <span className="text-green-400">{data.winRate.toFixed(1)}% win rate</span>
-                </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        )}
+          
+          {/* Hot Picks (Consensus) */}
+          <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-400" />
+              Hot Picks (2+ AIs Agree)
+              <Link href="/hot-picks" className="ml-auto text-xs text-cyan-400 hover:underline">
+                View All →
+              </Link>
+            </h3>
+            <div className="space-y-3">
+              {hotPicks.length > 0 ? (
+                hotPicks.slice(0, 5).map((hp) => (
+                  <div key={hp.ticker} className="flex items-center gap-3 p-2 bg-gray-800/50 rounded-lg">
+                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center font-bold">
+                      {hp.consensus}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold">{hp.ticker}</div>
+                      <div className="text-xs text-gray-400">{hp.aiNames.join(', ')}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">{hp.avgConfidence}%</div>
+                      <div className="text-xs text-gray-500">avg conf</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  {loading ? 'Loading...' : 'No consensus picks yet'}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Recent Winners */}
+          <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-emerald-400" />
+              Top Gainers
+              <Link href="/insights" className="ml-auto text-xs text-cyan-400 hover:underline">
+                View All →
+              </Link>
+            </h3>
+            <div className="space-y-2">
+              {recentWinners.length > 0 ? (
+                recentWinners.map((pick) => {
+                  const gain = pick.current_price && pick.entry_price 
+                    ? ((pick.current_price - pick.entry_price) / pick.entry_price) * 100
+                    : 0;
+                  return (
+                    <div key={pick.id} className="flex items-center gap-3 p-2 bg-emerald-900/20 rounded-lg border border-emerald-800/30">
+                      <div 
+                        className="w-8 h-8 rounded flex items-center justify-center text-white text-xs font-bold"
+                        style={{ backgroundColor: pick.ai_color }}
+                      >
+                        {pick.ticker.slice(0, 2)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{pick.ticker}</div>
+                        <div className="text-xs text-gray-400">{pick.ai_display_name}</div>
+                      </div>
+                      <div className="text-emerald-400 font-bold flex items-center gap-1">
+                        <TrendingUp className="w-4 h-4" />
+                        +{gain.toFixed(1)}%
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  {loading ? 'Loading...' : 'No winners yet'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
         
-        {/* Tab Content */}
-        {activeTab === 'overview' && (
-          <OverviewTab 
-            picks={filteredPicks} 
-            stats={stats} 
-            hotPicks={hotPicks}
-            leaderboard={leaderboard}
-          />
-        )}
+        {/* Filters + Search */}
+        <div className="mt-8 mb-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Target className="w-5 h-5 text-cyan-400" />
+            All AI Picks ({filteredPicks.length})
+          </h2>
+          
+          <div className="flex flex-wrap gap-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search ticker..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-cyan-500 w-40"
+              />
+            </div>
+            
+            {/* AI Filter */}
+            <select
+              value={selectedAI}
+              onChange={(e) => setSelectedAI(e.target.value)}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-cyan-500"
+            >
+              <option value="all">All AIs</option>
+              {aiModels.map(ai => (
+                <option key={ai.id} value={ai.id}>{ai.display_name}</option>
+              ))}
+            </select>
+            
+            {/* Sort */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-cyan-500"
+            >
+              <option value="date">Newest First</option>
+              <option value="confidence">Highest Confidence</option>
+              <option value="change">Best Performance</option>
+            </select>
+          </div>
+        </div>
         
-        {activeTab === 'picks' && (
-          <PicksTab 
-            picks={filteredPicks}
-            aiModels={aiModels}
-            selectedAI={selectedAI}
-            setSelectedAI={setSelectedAI}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            sortBy={sortBy}
-            setSortBy={setSortBy}
-            sortDir={sortDir}
-            setSortDir={setSortDir}
-          />
-        )}
+        {/* Picks Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredPicks.length > 0 ? (
+            filteredPicks.map((pick) => (
+              <PickCard key={pick.id} pick={pick} />
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12 text-gray-500">
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  Loading picks...
+                </div>
+              ) : (
+                <div>
+                  <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No picks found</p>
+                  <p className="text-sm mt-1">Try adjusting your filters</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         
-        {activeTab === 'leaderboard' && (
-          <LeaderboardTab leaderboard={leaderboard} category={category} />
-        )}
-        
-        {activeTab === 'compare' && (
-          <CompareTab stats={stats} picks={filteredPicks} />
-        )}
-        
-        {activeTab === 'insights' && (
-          <InsightsTab hotPicks={hotPicks} picks={filteredPicks} stats={stats} />
-        )}
+        {/* Help Link */}
+        <div className="mt-8 text-center">
+          <Link 
+            href="/help/understanding-picks" 
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-cyan-400 transition-colors"
+          >
+            <HelpCircle className="w-4 h-4" />
+            Need help understanding these picks?
+          </Link>
+        </div>
       </main>
     </div>
   );
 }
 
 // Stat Card Component
-function StatCard({ label, value, icon: Icon, color = 'gray' }: { 
-  label: string; 
-  value: string | number; 
+function StatCard({ icon: Icon, label, value, color }: { 
   icon: any; 
-  color?: string 
+  label: string; 
+  value: string | number;
+  color: string;
 }) {
   const colorClasses: Record<string, string> = {
     gray: 'bg-gray-800 text-gray-400',
-    green: 'bg-green-500/10 text-green-400',
-    red: 'bg-red-500/10 text-red-400',
     yellow: 'bg-yellow-500/10 text-yellow-400',
+    emerald: 'bg-emerald-500/10 text-emerald-400',
+    red: 'bg-red-500/10 text-red-400',
     purple: 'bg-purple-500/10 text-purple-400',
     indigo: 'bg-indigo-500/10 text-indigo-400',
     blue: 'bg-blue-500/10 text-blue-400',
+    orange: 'bg-orange-500/10 text-orange-400',
   };
   
   return (
-    <div className={`rounded-xl p-4 ${colorClasses[color]} border border-gray-800`}>
+    <div className={`rounded-xl p-3 border border-gray-800 ${colorClasses[color] || colorClasses.gray}`}>
       <div className="flex items-center gap-2 mb-1">
         <Icon className="w-4 h-4" />
-        <span className="text-xs uppercase tracking-wide opacity-80">{label}</span>
+        <span className="text-[10px] uppercase tracking-wide opacity-80">{label}</span>
       </div>
-      <div className="text-2xl font-bold">{value}</div>
-    </div>
-  );
-}
-
-// Overview Tab
-function OverviewTab({ picks, stats, hotPicks, leaderboard }: any) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Leaderboard Preview */}
-      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-yellow-400" />
-          AI Leaderboard
-        </h3>
-        <div className="space-y-3">
-          {leaderboard.slice(0, 5).map((ai: any, i: number) => (
-            <div key={ai.aiName} className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                i === 1 ? 'bg-gray-400/20 text-gray-300' :
-                i === 2 ? 'bg-orange-500/20 text-orange-400' :
-                'bg-gray-800 text-gray-400'
-              }`}>
-                {i + 1}
-              </div>
-              <div className="flex-1">
-                <div className="font-medium">{ai.aiName}</div>
-                <div className="text-xs text-gray-400">{ai.winRate.toFixed(1)}% win rate</div>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-indigo-400">{ai.points} pts</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* Hot Picks */}
-      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Flame className="w-5 h-5 text-orange-400" />
-          Consensus Picks
-        </h3>
-        <div className="space-y-3">
-          {hotPicks.slice(0, 5).map((pick: any) => (
-            <div key={pick.ticker} className="flex items-center gap-3 p-2 bg-gray-800/50 rounded-lg">
-              <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                <span className="font-bold text-indigo-400">{pick.ticker}</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{pick.ticker}</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-gray-600/30 text-gray-400">
-                    Target {pick.direction === 'UP' ? '↑' : '↓'}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-400">
-                  {pick.consensus} AIs agree • {pick.avgConfidence.toFixed(0)}% avg confidence
-                </div>
-              </div>
-            </div>
-          ))}
-          {hotPicks.length === 0 && (
-            <div className="text-center text-gray-400 py-4">No consensus picks yet</div>
-          )}
-        </div>
-      </div>
-      
-      {/* Recent Winners */}
-      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-green-400" />
-          Recent Winners
-        </h3>
-        <div className="space-y-3">
-          {picks.filter((p: any) => p.status === 'won').slice(0, 5).map((pick: any) => (
-            <div key={pick.id} className="flex items-center gap-3 p-2 bg-gray-800/50 rounded-lg">
-              <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-green-400" />
-              </div>
-              <div className="flex-1">
-                <div className="font-medium">{pick.ticker}</div>
-                <div className="text-xs text-gray-400">{pick.ai_name}</div>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-green-400">
-                  +{pick.price_change_percent?.toFixed(1) || '?'}%
-                </div>
-              </div>
-            </div>
-          ))}
-          {picks.filter((p: any) => p.status === 'won').length === 0 && (
-            <div className="text-center text-gray-400 py-4">No winners yet</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Picks Tab
-function PicksTab({ picks, aiModels, selectedAI, setSelectedAI, statusFilter, setStatusFilter, searchTerm, setSearchTerm, sortBy, setSortBy, sortDir, setSortDir }: any) {
-  return (
-    <div>
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search ticker or reasoning..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-indigo-500 focus:outline-none"
-          />
-        </div>
-        
-        <select
-          value={selectedAI}
-          onChange={(e) => setSelectedAI(e.target.value)}
-          className="px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-indigo-500 focus:outline-none"
-        >
-          <option value="all">All AIs</option>
-          {aiModels.map((ai: any) => (
-            <option key={ai.id} value={ai.display_name}>{ai.display_name}</option>
-          ))}
-        </select>
-        
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-indigo-500 focus:outline-none"
-        >
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="won">Winners</option>
-          <option value="lost">Losers</option>
-        </select>
-        
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:border-indigo-500 focus:outline-none"
-        >
-          <option value="date">Sort by Date</option>
-          <option value="confidence">Sort by Confidence</option>
-          <option value="profit">Sort by Profit</option>
-          <option value="ticker">Sort by Ticker</option>
-        </select>
-        
-        <button
-          onClick={() => setSortDir(sortDir === 'desc' ? 'asc' : 'desc')}
-          className="px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700"
-        >
-          {sortDir === 'desc' ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        </button>
-      </div>
-      
-      {/* Picks Grid */}
-      <div className="grid gap-4">
-        {picks.map((pick: any) => (
-          <PickCard key={pick.id} pick={pick} />
-        ))}
-        {picks.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            No picks found matching your filters
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Pick Card
-function PickCard({ pick }: { pick: StockPick }) {
-  const statusColors: Record<string, string> = {
-    active: 'border-yellow-500/50 bg-yellow-500/5',
-    won: 'border-green-500/50 bg-green-500/5',
-    lost: 'border-red-500/50 bg-red-500/5',
-    expired: 'border-gray-500/50 bg-gray-500/5',
-  };
-  
-  return (
-    <div className={`rounded-xl p-4 border ${statusColors[pick.status]} transition-all hover:scale-[1.01]`}>
-      <div className="flex items-start gap-4">
-        {/* Ticker */}
-        <div className="flex-shrink-0">
-          <div className="w-14 h-14 bg-gray-800 rounded-xl flex items-center justify-center">
-            <span className="font-bold text-lg">{pick.ticker}</span>
-          </div>
-          <div className="text-center mt-1">
-            <span className={`text-xs px-2 py-0.5 rounded capitalize ${
-              pick.category === 'crypto' ? 'bg-orange-500/20 text-orange-400' :
-              pick.category === 'penny' ? 'bg-green-500/20 text-green-400' :
-              'bg-blue-500/20 text-blue-400'
-            }`}>
-              {pick.category}
-            </span>
-          </div>
-        </div>
-        
-        {/* Details */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-semibold">{pick.ai_name}</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-gray-600/30 text-gray-400">
-              Target {pick.direction === 'UP' ? '↑' : pick.direction === 'DOWN' ? '↓' : '→'}
-            </span>
-            <span className="text-xs text-gray-400">{(pick.confidence || 0)}% confidence</span>
-          </div>
-          
-          <p className="text-sm text-gray-400 line-clamp-2 mb-2">{pick.reasoning}</p>
-          
-          <div className="flex gap-4 text-xs">
-            <div>
-              <span className="text-gray-500">Entry:</span>{' '}
-              <span className="text-white">${pick.entry_price?.toFixed(2)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Target:</span>{' '}
-              <span className="text-green-400">${pick.target_price?.toFixed(2)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Stop:</span>{' '}
-              <span className="text-red-400">${pick.stop_loss?.toFixed(2)}</span>
-            </div>
-            {pick.current_price && (
-              <div>
-                <span className="text-gray-500">Current:</span>{' '}
-                <span className="text-indigo-400">${(pick.current_price || 0).toFixed(2)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Status & P/L - Shows ACTUAL performance */}
-        <div className="text-right flex-shrink-0">
-          <div className={`text-lg font-bold ${
-            pick.status === 'won' ? 'text-green-400' :
-            pick.status === 'lost' ? 'text-red-400' :
-            pick.current_price && pick.price_change_percent !== null
-              ? (pick.price_change_percent > 0.01 ? 'text-green-400' : pick.price_change_percent < -0.01 ? 'text-red-400' : 'text-gray-400')
-              : 'text-yellow-400'
-          }`}>
-            {pick.current_price && pick.price_change_percent !== null
-              ? (Math.abs(pick.price_change_percent) < 0.01 
-                  ? 'EVEN' 
-                  : `${pick.price_change_percent > 0 ? '+' : ''}${pick.price_change_percent.toFixed(1)}%`)
-              : pick.status === 'active' 
-                ? 'PENDING'
-                : pick.status.toUpperCase()}
-          </div>
-          {pick.current_price && pick.price_change_percent !== null && Math.abs(pick.price_change_percent) >= 0.01 && (
-            <div className={`text-xs ${pick.price_change_percent > 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
-              {pick.price_change_percent > 0 ? '↑' : '↓'} ${Math.abs(pick.current_price - pick.entry_price).toFixed(2)}
-            </div>
-          )}
-          {pick.points_earned !== null && pick.points_earned !== 0 && (
-            <div className="text-sm text-gray-400">
-              {pick.points_earned > 0 ? '+' : ''}{pick.points_earned} pts
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Leaderboard Tab
-function LeaderboardTab({ leaderboard, category }: { leaderboard: any[]; category: Category }) {
-  return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-      <div className="p-4 border-b border-gray-800">
-        <h3 className="font-semibold flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-yellow-400" />
-          {category === 'all' ? 'Overall' : category.charAt(0).toUpperCase() + category.slice(1)} Leaderboard
-        </h3>
-      </div>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-800/50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Rank</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">AI</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Picks</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">W/L</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Win Rate</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Profit</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Points</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {leaderboard.map((ai, i) => (
-              <tr key={ai.aiName} className="hover:bg-gray-800/30 transition-colors">
-                <td className="px-4 py-4">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                    i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                    i === 1 ? 'bg-gray-400/20 text-gray-300' :
-                    i === 2 ? 'bg-orange-500/20 text-orange-400' :
-                    'bg-gray-800 text-gray-400'
-                  }`}>
-                    {i === 0 ? <Crown className="w-4 h-4" /> : i + 1}
-                  </div>
-                </td>
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: AI_COLORS[ai.aiName] || '#6366f1' }}
-                    />
-                    <span className="font-semibold">{ai.aiName}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-4 text-center">{ai.totalPicks}</td>
-                <td className="px-4 py-4 text-center">
-                  <span className="text-green-400">{ai.totalWins}</span>
-                  <span className="text-gray-500">/</span>
-                  <span className="text-red-400">{ai.totalLosses}</span>
-                </td>
-                <td className="px-4 py-4 text-center">
-                  <span className={ai.winRate >= 50 ? 'text-green-400' : 'text-red-400'}>
-                    {ai.winRate.toFixed(1)}%
-                  </span>
-                </td>
-                <td className={`px-4 py-4 text-right font-medium ${
-                  ai.totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  ${ai.totalProfitLoss.toFixed(2)}
-                </td>
-                <td className="px-4 py-4 text-right font-bold text-indigo-400">
-                  {ai.points}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// Compare Tab
-function CompareTab({ stats, picks }: { stats: any[]; picks: StockPick[] }) {
-  const [ai1, setAi1] = useState<string>(stats[0]?.aiName || '');
-  const [ai2, setAi2] = useState<string>(stats[1]?.aiName || '');
-  
-  const ai1Stats = stats.find(s => s.aiName === ai1);
-  const ai2Stats = stats.find(s => s.aiName === ai2);
-  
-  return (
-    <div>
-      <div className="flex gap-4 mb-6">
-        <select
-          value={ai1}
-          onChange={(e) => setAi1(e.target.value)}
-          className="flex-1 px-4 py-2 bg-gray-800 rounded-lg border border-gray-700"
-        >
-          {stats.map(s => (
-            <option key={s.aiName} value={s.aiName}>{s.aiName}</option>
-          ))}
-        </select>
-        <div className="flex items-center text-gray-400">VS</div>
-        <select
-          value={ai2}
-          onChange={(e) => setAi2(e.target.value)}
-          className="flex-1 px-4 py-2 bg-gray-800 rounded-lg border border-gray-700"
-        >
-          {stats.map(s => (
-            <option key={s.aiName} value={s.aiName}>{s.aiName}</option>
-          ))}
-        </select>
-      </div>
-      
-      {ai1Stats && ai2Stats && (
-        <div className="grid grid-cols-3 gap-4">
-          <CompareCard label="Total Picks" v1={ai1Stats.totalPicks} v2={ai2Stats.totalPicks} />
-          <CompareCard label="Win Rate" v1={ai1Stats.winRate} v2={ai2Stats.winRate} format="percent" />
-          <CompareCard label="Winners" v1={ai1Stats.totalWins} v2={ai2Stats.totalWins} />
-          <CompareCard label="Losers" v1={ai1Stats.totalLosses} v2={ai2Stats.totalLosses} inverse />
-          <CompareCard label="Profit/Loss" v1={ai1Stats.totalProfitLoss} v2={ai2Stats.totalProfitLoss} format="currency" />
-          <CompareCard label="Points" v1={ai1Stats.points} v2={ai2Stats.points} />
-          <CompareCard label="Avg Confidence" v1={ai1Stats.avgConfidence} v2={ai2Stats.avgConfidence} format="percent" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CompareCard({ label, v1, v2, format, inverse }: { 
-  label: string; 
-  v1: number; 
-  v2: number; 
-  format?: 'percent' | 'currency';
-  inverse?: boolean;
-}) {
-  const winner = inverse ? (v1 < v2 ? 1 : v1 > v2 ? 2 : 0) : (v1 > v2 ? 1 : v1 < v2 ? 2 : 0);
-  
-  const formatValue = (v: number) => {
-    if (format === 'percent') return `${v.toFixed(1)}%`;
-    if (format === 'currency') return `$${v.toFixed(2)}`;
-    return v.toString();
-  };
-  
-  return (
-    <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-      <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">{label}</div>
-      <div className="flex justify-between items-center">
-        <div className={`text-2xl font-bold ${winner === 1 ? 'text-green-400' : 'text-white'}`}>
-          {formatValue(v1)}
-        </div>
-        <div className={`text-2xl font-bold ${winner === 2 ? 'text-green-400' : 'text-white'}`}>
-          {formatValue(v2)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Insights Tab
-function InsightsTab({ hotPicks, picks, stats }: { hotPicks: any[]; picks: StockPick[]; stats: any[] }) {
-  // Best performer this period
-  const bestAI = stats[0];
-  
-  // Best single pick
-  const bestPick = [...picks]
-    .filter(p => p.status === 'won')
-    .sort((a, b) => (b.price_change_percent || 0) - (a.price_change_percent || 0))[0];
-  
-  // Most active ticker
-  const tickerCounts = picks.reduce((acc, p) => {
-    acc[p.ticker] = (acc[p.ticker] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  const mostActive = Object.entries(tickerCounts).sort((a, b) => b[1] - a[1])[0];
-  
-  return (
-    <div className="space-y-6">
-      {/* Key Insights */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {bestAI && (
-          <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-xl p-6 border border-yellow-500/30">
-            <div className="flex items-center gap-2 mb-2">
-              <Crown className="w-5 h-5 text-yellow-400" />
-              <span className="text-sm text-yellow-400">Leading AI</span>
-            </div>
-            <div className="text-2xl font-bold">{bestAI.aiName}</div>
-            <div className="text-sm text-gray-400 mt-1">
-              {bestAI.points} points • {bestAI.winRate.toFixed(1)}% win rate
-            </div>
-          </div>
-        )}
-        
-        {bestPick && (
-          <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-6 border border-green-500/30">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-5 h-5 text-green-400" />
-              <span className="text-sm text-green-400">Best Pick</span>
-            </div>
-            <div className="text-2xl font-bold">{bestPick.ticker}</div>
-            <div className="text-sm text-gray-400 mt-1">
-              +{bestPick.price_change_percent?.toFixed(1)}% by {bestPick.ai_name}
-            </div>
-          </div>
-        )}
-        
-        {mostActive && (
-          <div className="bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-xl p-6 border border-indigo-500/30">
-            <div className="flex items-center gap-2 mb-2">
-              <Flame className="w-5 h-5 text-indigo-400" />
-              <span className="text-sm text-indigo-400">Most Picked</span>
-            </div>
-            <div className="text-2xl font-bold">{mostActive[0]}</div>
-            <div className="text-sm text-gray-400 mt-1">
-              {mostActive[1]} picks across all AIs
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Consensus Picks */}
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <Flame className="w-5 h-5 text-orange-400" />
-          AI Consensus (2+ AIs agree)
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {hotPicks.map((pick: any) => (
-            <div key={pick.ticker} className="bg-gray-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-lg font-bold">{pick.ticker}</span>
-                <span className="px-2 py-1 rounded text-xs bg-gray-600/30 text-gray-400">
-                  Target {pick.direction === 'UP' ? '↑' : '↓'}
-                </span>
-              </div>
-              <div className="text-sm text-gray-400 mb-2">
-                <span className="text-indigo-400 font-semibold">{pick.consensus} AIs</span> agree
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {pick.aiNames.map((name: string) => (
-                  <span 
-                    key={name} 
-                    className="text-xs px-2 py-0.5 rounded-full bg-gray-700"
-                    style={{ borderLeft: `3px solid ${AI_COLORS[name] || '#6366f1'}` }}
-                  >
-                    {name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-          
-          {hotPicks.length === 0 && (
-            <div className="col-span-full text-center py-8 text-gray-400">
-              No consensus picks found yet
-            </div>
-          )}
-        </div>
-      </div>
+      <div className="text-xl font-bold">{value}</div>
     </div>
   );
 }
