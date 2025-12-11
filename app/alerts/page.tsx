@@ -7,6 +7,7 @@ import {
   ArrowUpRight, ArrowDownRight, HelpCircle, Zap, Volume2
 } from 'lucide-react';
 import { getPicks, type StockPick } from '@/lib/supabase';
+import { JavariHelpButton } from '@/components/JavariWidget';
 
 // Local storage key
 const ALERTS_STORAGE_KEY = 'market-oracle-alerts';
@@ -502,6 +503,7 @@ export default function AlertsPage() {
             <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
               Price Alerts
             </span>
+            <JavariHelpButton topic="price alerts how to use" />
           </h1>
           <p className="text-gray-400">
             Get notified when AI picks hit your price targets. Alerts are checked in real-time.
