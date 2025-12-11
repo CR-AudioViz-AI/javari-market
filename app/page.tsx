@@ -14,6 +14,7 @@ import {
   getOverallStats, getRecentWinners,
   type StockPick, type AIModel, type Category 
 } from '@/lib/supabase';
+import { JavariHelpButton } from '@/components/JavariWidget';
 
 // Category configuration
 const CATEGORIES: Record<Category | 'all', { name: string; icon: any; color: string }> = {
@@ -47,7 +48,10 @@ function PickCard({ pick }: { pick: StockPick }) {
           </div>
           <div>
             <h3 className="font-bold text-white text-lg">{pick.ticker}</h3>
-            <p className="text-xs text-gray-400">{pick.ai_display_name}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-gray-400">{pick.ai_display_name}</p>
+              <JavariHelpButton ticker={pick.ticker} topic="pick" className="opacity-0 group-hover:opacity-100" />
+            </div>
           </div>
         </div>
         <div className="text-right">
@@ -372,6 +376,7 @@ export default function DashboardPage() {
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-yellow-400" />
               AI Leaderboard
+              <JavariHelpButton topic="AI leaderboard battle" />
               <Link href="/battle" className="ml-auto text-xs text-cyan-400 hover:underline">
                 View Full →
               </Link>
@@ -394,6 +399,7 @@ export default function DashboardPage() {
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Flame className="w-5 h-5 text-orange-400" />
               Hot Picks (2+ AIs Agree)
+              <JavariHelpButton topic="hot picks consensus" />
               <Link href="/hot-picks" className="ml-auto text-xs text-cyan-400 hover:underline">
                 View All →
               </Link>
