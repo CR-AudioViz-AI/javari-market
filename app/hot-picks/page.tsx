@@ -8,6 +8,7 @@ import {
   Star, Trophy, Zap, HelpCircle, ChevronRight
 } from 'lucide-react';
 import { getHotPicks, type Category } from '@/lib/supabase';
+import { JavariHelpButton } from '@/components/JavariWidget';
 
 // Consensus tier configuration
 const CONSENSUS_TIERS = {
@@ -212,6 +213,7 @@ export default function HotPicksPage() {
             <span className="bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
               Hot Picks
             </span>
+            <JavariHelpButton topic="hot picks consensus explained" />
           </h1>
           <p className="text-lg text-gray-400 max-w-2xl mx-auto">
             When multiple AIs agree on a stock, pay attention! These consensus picks 
