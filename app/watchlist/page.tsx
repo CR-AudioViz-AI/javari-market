@@ -8,6 +8,7 @@ import {
   Eye, HelpCircle, Target, Filter
 } from 'lucide-react';
 import { getPicks, type StockPick } from '@/lib/supabase';
+import { JavariHelpButton } from '@/components/JavariWidget';
 
 // Local storage key
 const WATCHLIST_STORAGE_KEY = 'market-oracle-watchlist';
@@ -293,6 +294,7 @@ export default function WatchlistPage() {
             <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
               Watchlist
             </span>
+            <JavariHelpButton topic="watchlist how to use" />
           </h1>
           <p className="text-gray-400 max-w-2xl mx-auto">
             Track your favorite AI picks. Your watchlist is saved locally and updates with real-time prices.
