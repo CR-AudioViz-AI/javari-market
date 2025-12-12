@@ -212,22 +212,21 @@ export default function DashboardPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [picksData, modelsData, statsData, hotData, overallData, winnersData] = await Promise.all([
-        getPicks({ category: category === 'all' ? undefined : category, limit: 500 }),
-        getAIModels(),
-        getAIStatistics(category === 'all' ? undefined : category),
-        getHotPicks(category === 'all' ? undefined : category),
-        getOverallStats(),
-        getRecentWinners(5),
-      ]);
+      // Fetch from API route for reliable data loading
+      const response = await fetch(`/api/dashboard-data?category=${category}`);
+      const result = await response.json();
       
-      setPicks(picksData);
-      setAiModels(modelsData);
-      setAiStats(statsData);
-      setHotPicks(hotData);
-      setOverallStats(overallData);
-      setRecentWinners(winnersData);
-      setLastUpdate(new Date());
+      if (result.success && result.data) {
+        setPicks(result.data.picks || []);
+        setAiModels(result.data.aiModels || []);
+        setAiStats(result.data.aiStats || []);
+        setHotPicks(result.data.hotPicks || []);
+        setOverallStats(result.data.overallStats || {});
+        setRecentWinners(result.data.recentWinners || []);
+        setLastUpdate(new Date());
+      } else {
+        console.error('API returned error:', result.error);
+      }
     } catch (e) {
       console.error('Load error:', e);
     }
@@ -584,3 +583,4 @@ function StatCard({ icon: Icon, label, value, color }: {
     </div>
   );
 }
+
