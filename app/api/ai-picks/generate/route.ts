@@ -1,12 +1,13 @@
 // app/api/ai-picks/generate/route.ts
 // Market Oracle Ultimate - Generate AI Picks API
 // Created: December 13, 2025
+// Updated: December 14, 2025 - Added DB error reporting
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAllAIPicks, generatePickFromAI } from '@/lib/ai/pick-generator';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // Allow up to 60 seconds for AI generation
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
       symbol: upperSymbol,
       picks: result.picks,
       consensus: result.consensus,
+      dbErrors: result.dbErrors,
       timestamp: new Date().toISOString(),
     });
 
@@ -67,7 +69,6 @@ export async function GET(request: NextRequest) {
     const aiModel = searchParams.get('ai');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    // Import supabase here to avoid issues
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
