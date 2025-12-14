@@ -1,8 +1,3 @@
-// lib/ai/pick-generator.ts
-// Market Oracle Ultimate - AI Pick Generation System
-// Created: December 13, 2025
-// Updated: December 14, 2025 - Fixed env vars, database writes
-
 import { createClient } from '@supabase/supabase-js';
 import type { AIModelName, AIPick, PickDirection, ConsensusAssessment } from '../types/learning';
 import { getLatestCalibration } from '../learning/calibration-engine';
@@ -135,14 +130,90 @@ function parsePick(res: string, ai: AIModelName, m: MarketData): AIPick | null {
 
 function toDb(p: AIPick): Record<string, unknown> {
   return {
-    id: p.id, ai_model: p.aiModel, symbol: p.symbol, company_name: p.companyName, sector: p.sector,
-    direction: p.direction, confidence: p.confidence, timeframe: p.timeframe,
-    entry_price: p.entryPrice, target_price: p.targetPrice, stop_loss: p.stopLoss,
-    thesis: p.thesis, full_reasoning: p.fullReasoning, factor_assessments: p.factorAssessments,
-    key_bullish_factors: p.keyBullishFactors, key_bearish_factors: p.keyBearishFactors,
-    risks: p.risks, catalysts: p.catalysts, created_at: p.createdAt.toISOString(),
-    expires_at: p.expiresAt.toISOString(), status: p.status,
+    id: p.id, 
+    ai_model: p.aiModel, 
+    symbol: p.symbol, 
+    company_name: p.companyName, 
+    sector: p.sector,
+    direction: p.direction, 
+    confidence: p.confidence, 
+    timeframe: p.timeframe,
+    entry_price: p.entryPrice, 
+    target_price: p.targetPrice, 
+    stop_loss: p.stopLoss,
+    thesis: p.thesis, 
+    full_reasoning: p.fullReasoning, 
+    factor_assessments: p.factorAssessments,
+    key_bullish_factors: p.keyBullishFactors, 
+    key_bearish_factors: p.keyBearishFactors,
+    risks: p.risks, 
+    catalysts: p.catalysts, 
+    created_at: p.createdAt.toISOString(),
+    expires_at: p.expiresAt.toISOString(), 
+    status: p.status,
   };
+}
+
+async function savePickToDb(pick: AIPick): Promise<{ success: boolean; error?: string }> {
+  try {
+    const dbData = toDb(pick);
+    console.log('Saving pick to DB:', JSON.stringify(dbData, null, 2));
+    
+    const { data, error } = await supabase
+      .from('market_oracle_picks')
+      .insert(dbData)
+      .select();
+    
+    if (error) {
+      console.error('Supabase insert error:', error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log('Pick saved successfully:', data);
+    return { success: true };
+  } catch (err) {
+    console.error('Save pick error:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
+async function saveConsensusToDb(symbol: string, consensus: ConsensusAssessment): Promise<{ success: boolean; error?: string }> {
+  try {
+    const agreeingModels = consensus.aiPicks
+      .filter(p => p.direction === consensus.consensusDirection)
+      .map(p => p.aiModel);
+    
+    const dbData = {
+      symbol,
+      direction: consensus.consensusDirection,
+      ai_combination: agreeingModels,
+      ai_combination_key: agreeingModels.sort().join('+'),
+      consensus_strength: consensus.consensusStrength,
+      weighted_confidence: consensus.weightedConfidence,
+      javari_confidence: consensus.javariConfidence,
+      javari_reasoning: consensus.javariReasoning,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+    };
+    
+    console.log('Saving consensus to DB:', JSON.stringify(dbData, null, 2));
+    
+    const { data, error } = await supabase
+      .from('market_oracle_consensus_picks')
+      .insert(dbData)
+      .select();
+    
+    if (error) {
+      console.error('Supabase consensus insert error:', error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log('Consensus saved successfully:', data);
+    return { success: true };
+  } catch (err) {
+    console.error('Save consensus error:', err);
+    return { success: false, error: String(err) };
+  }
 }
 
 export async function generatePickFromAI(ai: Exclude<AIModelName, 'javari'>, sym: string): Promise<AIPick | null> {
@@ -158,44 +229,38 @@ export async function generatePickFromAI(ai: Exclude<AIModelName, 'javari'>, sym
   const pick = parsePick(res, ai, m);
   if (!pick) return null;
   
-  // Save to database with error logging
-  const { error } = await supabase.from('market_oracle_picks').insert(toDb(pick));
-  if (error) console.error('DB insert error:', error);
+  // Save to database with error handling
+  const saveResult = await savePickToDb(pick);
+  if (!saveResult.success) {
+    console.error(`Failed to save ${ai} pick to DB:`, saveResult.error);
+  }
   
   return pick;
 }
 
-export async function generateAllAIPicks(symbol: string): Promise<{ picks: AIPick[]; consensus: ConsensusAssessment | null }> {
+export async function generateAllAIPicks(symbol: string): Promise<{ picks: AIPick[]; consensus: ConsensusAssessment | null; dbErrors: string[] }> {
   const picks: AIPick[] = [];
+  const dbErrors: string[] = [];
+  
   for (const ai of ['gpt4', 'perplexity'] as const) {
     if (AI_CONFIGS[ai].enabled) {
       const p = await generatePickFromAI(ai, symbol);
       if (p) picks.push(p);
     }
   }
+  
   let consensus: ConsensusAssessment | null = null;
   if (picks.length >= 2) {
     const fp = picks.map(p => ({ aiModel: p.aiModel, direction: p.direction, confidence: p.confidence, pickId: p.id }));
     consensus = await buildJavariConsensus(symbol, fp);
+    
     if (consensus) {
-      const agreeingModels = consensus.aiPicks
-        .filter(p => p.direction === consensus!.consensusDirection)
-        .map(p => p.aiModel);
-      
-      const { error } = await supabase.from('market_oracle_consensus_picks').insert({
-        symbol,
-        direction: consensus.consensusDirection,
-        ai_combination: agreeingModels,
-        ai_combination_key: agreeingModels.sort().join('+'),
-        consensus_strength: consensus.consensusStrength,
-        weighted_confidence: consensus.weightedConfidence,
-        javari_confidence: consensus.javariConfidence,
-        javari_reasoning: consensus.javariReasoning,
-        status: 'PENDING',
-        created_at: new Date().toISOString(),
-      });
-      if (error) console.error('Consensus DB insert error:', error);
+      const saveResult = await saveConsensusToDb(symbol, consensus);
+      if (!saveResult.success) {
+        dbErrors.push(`Consensus save failed: ${saveResult.error}`);
+      }
     }
   }
-  return { picks, consensus };
+  
+  return { picks, consensus, dbErrors };
 }
