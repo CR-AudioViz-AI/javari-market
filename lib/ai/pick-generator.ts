@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AIModelName, AIPick, PickDirection } from '../types/learning';
+import type { AIModelName, AIPick, PickDirection, ConsensusAssessment } from '../types/learning';
 import { getLatestCalibration } from '../learning/calibration-engine';
 import { buildJavariConsensus } from '../learning/javari-consensus';
 
@@ -156,7 +156,7 @@ export async function generatePickFromAI(ai: Exclude<AIModelName, 'javari'>, sym
   return pick;
 }
 
-export async function generateAllAIPicks(symbol: string): Promise<{ picks: AIPick[]; consensus: Awaited<ReturnType<typeof buildJavariConsensus>> | null }> {
+export async function generateAllAIPicks(symbol: string): Promise<{ picks: AIPick[]; consensus: ConsensusAssessment | null }> {
   const picks: AIPick[] = [];
   for (const ai of ['gpt4', 'perplexity'] as const) {
     if (AI_CONFIGS[ai].enabled) {
@@ -164,17 +164,27 @@ export async function generateAllAIPicks(symbol: string): Promise<{ picks: AIPic
       if (p) picks.push(p);
     }
   }
-  let consensus = null;
+  let consensus: ConsensusAssessment | null = null;
   if (picks.length >= 2) {
     const fp = picks.map(p => ({ aiModel: p.aiModel, direction: p.direction, confidence: p.confidence, pickId: p.id }));
     consensus = await buildJavariConsensus(symbol, fp);
     if (consensus) {
+      // Get agreeing models from aiPicks
+      const agreeingModels = consensus.aiPicks
+        .filter(p => p.direction === consensus!.consensusDirection)
+        .map(p => p.aiModel);
+      
       await supabase.from('market_oracle_consensus_picks').insert({
-        symbol, direction: consensus.direction, ai_combination: consensus.agreeingModels,
-        ai_combination_key: consensus.agreeingModels.sort().join('+'),
-        consensus_strength: consensus.consensusStrength, weighted_confidence: consensus.weightedConfidence,
-        javari_confidence: consensus.javariConfidence, javari_reasoning: consensus.reasoning,
-        status: 'PENDING', created_at: new Date().toISOString(),
+        symbol,
+        direction: consensus.consensusDirection,
+        ai_combination: agreeingModels,
+        ai_combination_key: agreeingModels.sort().join('+'),
+        consensus_strength: consensus.consensusStrength,
+        weighted_confidence: consensus.weightedConfidence,
+        javari_confidence: consensus.javariConfidence,
+        javari_reasoning: consensus.javariReasoning,
+        status: 'PENDING',
+        created_at: new Date().toISOString(),
       });
     }
   }
