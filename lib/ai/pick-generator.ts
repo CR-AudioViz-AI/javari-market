@@ -38,25 +38,25 @@ const AI_CONFIGS: Record<Exclude<AIModelName, 'javari'>, AIConfig> = {
     model: 'gpt-4-turbo-preview',
     maxTokens: 2000,
     temperature: 0.3,
-    enabled: true, // WORKING
+    enabled: true,
   },
   claude: {
     model: 'claude-3-sonnet-20240229',
     maxTokens: 2000,
     temperature: 0.3,
-    enabled: false, // DISABLED - needs billing credits
+    enabled: false,
   },
   gemini: {
     model: 'gemini-1.5-flash',
     maxTokens: 2000,
     temperature: 0.3,
-    enabled: false, // DISABLED - API key 403 error
+    enabled: false,
   },
   perplexity: {
-    model: 'sonar', // UPDATED from llama-3.1-sonar-large-128k-online
+    model: 'sonar',
     maxTokens: 2000,
     temperature: 0.3,
-    enabled: true, // WORKING
+    enabled: true,
   },
 };
 
@@ -86,7 +86,6 @@ async function getMarketData(symbol: string): Promise<MarketData | null> {
   try {
     const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY;
     
-    // Get quote data
     const quoteResponse = await fetch(
       `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${alphaVantageKey}`
     );
@@ -98,7 +97,6 @@ async function getMarketData(symbol: string): Promise<MarketData | null> {
       return null;
     }
 
-    // Get company overview
     const overviewResponse = await fetch(
       `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${alphaVantageKey}`
     );
@@ -157,64 +155,44 @@ ${recentNews.length > 0 ? recentNews.map((n, i) => `${i + 1}. ${n}`).join('\n') 
 
   if (calibration) {
     prompt += `
-## YOUR CALIBRATION NOTES (Based on past performance)
-- Best sectors for you: ${calibration.bestSectors.join(', ') || 'Still learning'}
-- Sectors to be cautious in: ${calibration.worstSectors.join(', ') || 'Still learning'}
-- Adjustments to make: ${calibration.adjustments.slice(0, 3).join('; ') || 'None yet'}
+## YOUR CALIBRATION NOTES
+- Best sectors: ${calibration.bestSectors.join(', ') || 'Still learning'}
+- Caution sectors: ${calibration.worstSectors.join(', ') || 'Still learning'}
+- Adjustments: ${calibration.adjustments.slice(0, 3).join('; ') || 'None yet'}
 `;
   }
 
   prompt += `
 ## YOUR TASK
-Analyze this stock and provide a recommendation. You MUST respond in this EXACT JSON format:
+Respond in this EXACT JSON format only:
 
 {
   "direction": "UP" | "DOWN" | "HOLD",
   "confidence": <number 0-100>,
-  "thesis": "<one sentence summary of your thesis>",
-  "full_reasoning": "<detailed 2-3 paragraph analysis>",
-  "target_price": <number - your price target>,
-  "stop_loss": <number - your stop loss>,
+  "thesis": "<one sentence>",
+  "full_reasoning": "<2-3 paragraphs>",
+  "target_price": <number>,
+  "stop_loss": <number>,
   "timeframe": "1W" | "2W" | "1M",
-  "factor_assessments": [
-    {
-      "factorId": "pe_ratio" | "volume_trend" | "sma_50" | "news_sentiment" | "price_momentum_1m",
-      "factorName": "<human readable name>",
-      "value": "<the value you observed>",
-      "interpretation": "BULLISH" | "BEARISH" | "NEUTRAL",
-      "confidence": <0-100>,
-      "reasoning": "<why this factor matters for this pick>"
-    }
-  ],
-  "key_bullish_factors": ["<factor 1>", "<factor 2>"],
-  "key_bearish_factors": ["<factor 1>", "<factor 2>"],
-  "risks": ["<risk 1>", "<risk 2>"],
-  "catalysts": ["<upcoming catalyst 1>", "<catalyst 2>"]
+  "factor_assessments": [{"factorId": "pe_ratio", "factorName": "P/E Ratio", "value": "<value>", "interpretation": "BULLISH" | "BEARISH" | "NEUTRAL", "confidence": <0-100>, "reasoning": "<why>"}],
+  "key_bullish_factors": ["<factor>"],
+  "key_bearish_factors": ["<factor>"],
+  "risks": ["<risk>"],
+  "catalysts": ["<catalyst>"]
 }
 
-IMPORTANT:
-- Be specific with numbers and reasoning
-- Your confidence should reflect your actual certainty (don't be overconfident)
-- Include at least 3 factor assessments
-- Stop loss should typically be 5-10% from entry
-- Target should reflect your timeframe (1W: 2-5%, 2W: 5-10%, 1M: 10-20%)
-- If you don't have a strong view, use "HOLD" with lower confidence
-
-Respond ONLY with the JSON object, no additional text or markdown.`;
+Respond ONLY with valid JSON, no markdown.`;
 
   return prompt;
 }
 
 // ============================================================================
-// CALL GPT-4
+// AI CALL FUNCTIONS
 // ============================================================================
 
 async function callGPT4(prompt: string): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.error('OPENAI_API_KEY not set');
-    return null;
-  }
+  if (!apiKey) return null;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -226,7 +204,7 @@ async function callGPT4(prompt: string): Promise<string | null> {
       body: JSON.stringify({
         model: AI_CONFIGS.gpt4.model,
         messages: [
-          { role: 'system', content: 'You are a professional stock analyst. Always respond with valid JSON only, no markdown formatting.' },
+          { role: 'system', content: 'You are a professional stock analyst. Respond with valid JSON only.' },
           { role: 'user', content: prompt },
         ],
         max_tokens: AI_CONFIGS.gpt4.maxTokens,
@@ -234,11 +212,7 @@ async function callGPT4(prompt: string): Promise<string | null> {
       }),
     });
 
-    if (!response.ok) {
-      console.error(`GPT-4 API error: ${response.status}`);
-      return null;
-    }
-
+    if (!response.ok) return null;
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
@@ -247,16 +221,8 @@ async function callGPT4(prompt: string): Promise<string | null> {
   }
 }
 
-// ============================================================================
-// CALL CLAUDE - DISABLED (needs billing)
-// ============================================================================
-
 async function callClaude(prompt: string): Promise<string | null> {
-  if (!AI_CONFIGS.claude.enabled) {
-    console.log('Claude API disabled - needs billing credits');
-    return null;
-  }
-  
+  if (!AI_CONFIGS.claude.enabled) return null;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
@@ -271,35 +237,20 @@ async function callClaude(prompt: string): Promise<string | null> {
       body: JSON.stringify({
         model: AI_CONFIGS.claude.model,
         max_tokens: AI_CONFIGS.claude.maxTokens,
-        messages: [
-          { role: 'user', content: prompt },
-        ],
+        messages: [{ role: 'user', content: prompt }],
       }),
     });
 
-    if (!response.ok) {
-      console.error(`Claude API error: ${response.status}`);
-      return null;
-    }
-
+    if (!response.ok) return null;
     const data = await response.json();
     return data.content[0].text;
   } catch (error) {
-    console.error('Claude call failed:', error);
     return null;
   }
 }
 
-// ============================================================================
-// CALL GEMINI - DISABLED (API key issue)
-// ============================================================================
-
 async function callGemini(prompt: string): Promise<string | null> {
-  if (!AI_CONFIGS.gemini.enabled) {
-    console.log('Gemini API disabled - 403 error');
-    return null;
-  }
-  
+  if (!AI_CONFIGS.gemini.enabled) return null;
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
   if (!apiKey) return null;
 
@@ -309,35 +260,20 @@ async function callGemini(prompt: string): Promise<string | null> {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       }
     );
 
-    if (!response.ok) {
-      console.error(`Gemini API error: ${response.status}`);
-      return null;
-    }
-
+    if (!response.ok) return null;
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
   } catch (error) {
-    console.error('Gemini call failed:', error);
     return null;
   }
 }
 
-// ============================================================================
-// CALL PERPLEXITY - WORKING
-// ============================================================================
-
 async function callPerplexity(prompt: string): Promise<string | null> {
-  if (!AI_CONFIGS.perplexity.enabled) {
-    console.log('Perplexity API disabled');
-    return null;
-  }
-  
+  if (!AI_CONFIGS.perplexity.enabled) return null;
   const apiKey = process.env.PERPLEXITY_API_KEY;
   if (!apiKey) return null;
 
@@ -349,9 +285,9 @@ async function callPerplexity(prompt: string): Promise<string | null> {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: AI_CONFIGS.perplexity.model, // "sonar"
+        model: AI_CONFIGS.perplexity.model,
         messages: [
-          { role: 'system', content: 'You are a professional stock analyst. Always respond with valid JSON only.' },
+          { role: 'system', content: 'You are a professional stock analyst. Respond with valid JSON only.' },
           { role: 'user', content: prompt },
         ],
         max_tokens: AI_CONFIGS.perplexity.maxTokens,
@@ -359,15 +295,10 @@ async function callPerplexity(prompt: string): Promise<string | null> {
       }),
     });
 
-    if (!response.ok) {
-      console.error(`Perplexity API error: ${response.status}`);
-      return null;
-    }
-
+    if (!response.ok) return null;
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
-    console.error('Perplexity call failed:', error);
     return null;
   }
 }
@@ -378,7 +309,6 @@ async function callPerplexity(prompt: string): Promise<string | null> {
 
 function parseAIResponse(response: string, aiModel: AIModelName, marketData: MarketData): AIPick | null {
   try {
-    // Clean up response - remove markdown code blocks if present
     let cleaned = response.trim();
     if (cleaned.startsWith('```json')) {
       cleaned = cleaned.replace(/^```json\s*/, '').replace(/\s*```$/, '');
@@ -387,55 +317,73 @@ function parseAIResponse(response: string, aiModel: AIModelName, marketData: Mar
     }
 
     const parsed = JSON.parse(cleaned);
+    const now = new Date();
+    const expiresAt = new Date(now);
+    const timeframe = parsed.timeframe || '1W';
+    
+    switch (timeframe) {
+      case '2W': expiresAt.setDate(expiresAt.getDate() + 14); break;
+      case '1M': expiresAt.setDate(expiresAt.getDate() + 30); break;
+      default: expiresAt.setDate(expiresAt.getDate() + 7);
+    }
 
+    // Return with camelCase properties matching the TypeScript interface
     const pick: AIPick = {
       id: crypto.randomUUID(),
-      ai_model: aiModel,
+      aiModel: aiModel,
       symbol: marketData.symbol,
-      company_name: marketData.companyName,
+      companyName: marketData.companyName,
       sector: marketData.sector,
       direction: parsed.direction as PickDirection,
       confidence: parsed.confidence,
-      timeframe: parsed.timeframe || '1W',
-      entry_price: marketData.currentPrice,
-      target_price: parsed.target_price,
-      stop_loss: parsed.stop_loss,
+      timeframe: timeframe,
+      entryPrice: marketData.currentPrice,
+      targetPrice: parsed.target_price,
+      stopLoss: parsed.stop_loss,
       thesis: parsed.thesis,
-      full_reasoning: parsed.full_reasoning,
-      factor_assessments: parsed.factor_assessments || [],
-      key_bullish_factors: parsed.key_bullish_factors || [],
-      key_bearish_factors: parsed.key_bearish_factors || [],
+      fullReasoning: parsed.full_reasoning,
+      factorAssessments: parsed.factor_assessments || [],
+      keyBullishFactors: parsed.key_bullish_factors || [],
+      keyBearishFactors: parsed.key_bearish_factors || [],
       risks: parsed.risks || [],
       catalysts: parsed.catalysts || [],
-      created_at: new Date().toISOString(),
-      expires_at: getExpirationDate(parsed.timeframe || '1W'),
+      createdAt: now,
+      expiresAt: expiresAt,
       status: 'PENDING',
     };
 
     return pick;
   } catch (error) {
     console.error(`Failed to parse ${aiModel} response:`, error);
-    console.error('Raw response:', response.substring(0, 500));
     return null;
   }
 }
 
-function getExpirationDate(timeframe: string): string {
-  const now = new Date();
-  switch (timeframe) {
-    case '1W':
-      now.setDate(now.getDate() + 7);
-      break;
-    case '2W':
-      now.setDate(now.getDate() + 14);
-      break;
-    case '1M':
-      now.setDate(now.getDate() + 30);
-      break;
-    default:
-      now.setDate(now.getDate() + 7);
-  }
-  return now.toISOString();
+// Convert camelCase pick to snake_case for database
+function pickToDbFormat(pick: AIPick): Record<string, unknown> {
+  return {
+    id: pick.id,
+    ai_model: pick.aiModel,
+    symbol: pick.symbol,
+    company_name: pick.companyName,
+    sector: pick.sector,
+    direction: pick.direction,
+    confidence: pick.confidence,
+    timeframe: pick.timeframe,
+    entry_price: pick.entryPrice,
+    target_price: pick.targetPrice,
+    stop_loss: pick.stopLoss,
+    thesis: pick.thesis,
+    full_reasoning: pick.fullReasoning,
+    factor_assessments: pick.factorAssessments,
+    key_bullish_factors: pick.keyBullishFactors,
+    key_bearish_factors: pick.keyBearishFactors,
+    risks: pick.risks,
+    catalysts: pick.catalysts,
+    created_at: pick.createdAt.toISOString(),
+    expires_at: pick.expiresAt.toISOString(),
+    status: pick.status,
+  };
 }
 
 // ============================================================================
@@ -448,26 +396,20 @@ export async function generatePickFromAI(
 ): Promise<AIPick | null> {
   console.log(`Generating ${aiModel} pick for ${symbol}...`);
   
-  // Check if model is enabled
   if (!AI_CONFIGS[aiModel].enabled) {
     console.log(`${aiModel} is disabled`);
     return null;
   }
 
-  // Get market data
   const marketData = await getMarketData(symbol);
   if (!marketData) {
     console.error(`Could not get market data for ${symbol}`);
     return null;
   }
 
-  // Get calibration data if available
   const calibration = await getLatestCalibration(aiModel);
-
-  // Build prompt
   const prompt = buildAnalysisPrompt(marketData, calibration, []);
 
-  // Call appropriate AI
   let response: string | null = null;
   switch (aiModel) {
     case 'gpt4':
@@ -489,17 +431,17 @@ export async function generatePickFromAI(
     return null;
   }
 
-  // Parse response
   const pick = parseAIResponse(response, aiModel, marketData);
   if (!pick) {
     console.error(`Failed to parse ${aiModel} response`);
     return null;
   }
 
-  // Save to database
+  // Save to database using snake_case format
+  const dbPick = pickToDbFormat(pick);
   const { error } = await supabase
     .from('market_oracle_picks')
-    .insert(pick);
+    .insert(dbPick);
 
   if (error) {
     console.error(`Failed to save ${aiModel} pick:`, error);
@@ -518,11 +460,9 @@ export async function generateAllAIPicks(symbol: string): Promise<{
   picks: AIPick[];
   consensus: ReturnType<typeof buildJavariConsensus> | null;
 }> {
-  console.log(`\n========================================`);
   console.log(`Generating ALL AI picks for ${symbol}`);
-  console.log(`========================================\n`);
 
-  const aiModels: Exclude<AIModelName, 'javari'>[] = ['gpt4', 'perplexity']; // Only enabled models
+  const aiModels: Exclude<AIModelName, 'javari'>[] = ['gpt4', 'perplexity'];
   const picks: AIPick[] = [];
 
   for (const model of aiModels) {
@@ -538,12 +478,10 @@ export async function generateAllAIPicks(symbol: string): Promise<{
     }
   }
 
-  // Generate Javari consensus if we have picks
   let consensus = null;
   if (picks.length >= 2) {
     consensus = buildJavariConsensus(picks);
     
-    // Save consensus to database
     if (consensus) {
       const { error } = await supabase
         .from('market_oracle_consensus_picks')
@@ -566,9 +504,6 @@ export async function generateAllAIPicks(symbol: string): Promise<{
     }
   }
 
-  console.log(`\n========================================`);
   console.log(`Generated ${picks.length} picks for ${symbol}`);
-  console.log(`========================================\n`);
-
   return { picks, consensus };
 }
