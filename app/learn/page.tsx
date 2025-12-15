@@ -18,7 +18,7 @@ interface Module {
   description: string;
   duration: string;
   lessons: Lesson[];
-  icon: React.ReactNode;
+  icon: JSX.Element;
 }
 
 interface Lesson {
