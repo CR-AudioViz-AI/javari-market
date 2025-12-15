@@ -1,235 +1,197 @@
-# Market Oracle - Complete Documentation
+# Market Oracle AI - Documentation Index
 
-## Table of Contents
-1. [Overview](#overview)
-2. [Architecture](#architecture)
-3. [Features](#features)
-4. [API Reference](#api-reference)
-5. [Database Schema](#database-schema)
-6. [Cron Jobs](#cron-jobs)
-7. [Deployment](#deployment)
-8. [Troubleshooting](#troubleshooting)
+**Complete documentation for the Multi-AI Stock Analysis Platform**
+
+Last Updated: December 15, 2025
 
 ---
 
-## Overview
+## 📚 Documentation Files
 
-Market Oracle is an AI-powered stock prediction competition platform where 5 leading AI models compete weekly to make the best stock, crypto, and penny stock picks.
-
-### Key Stats
-- **5 AI Models**: GPT-4, Claude, Gemini, Perplexity, Javari
-- **75 Weekly Picks**: 25 per category (Regular, Penny, Crypto)
-- **Real-Time Pricing**: Updates every 15 minutes
-- **Educational Focus**: Not for actual trading
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Market Oracle Platform                     │
-├─────────────────────────────────────────────────────────────┤
-│  Frontend (Next.js 14)                                       │
-│  ├── Dashboard (main picks view)                             │
-│  ├── AI Battle (leaderboard)                                 │
-│  ├── Help Center (documentation)                             │
-│  └── Javari Widget (AI chat)                                 │
-├─────────────────────────────────────────────────────────────┤
-│  API Routes                                                   │
-│  ├── /api/market-oracle/generate-picks                       │
-│  ├── /api/market-oracle/update-prices                        │
-│  └── /api/market-oracle/update-performance                   │
-├─────────────────────────────────────────────────────────────┤
-│  External Services                                            │
-│  ├── Supabase (PostgreSQL database)                          │
-│  ├── OpenAI, Anthropic, Google, Perplexity (AI providers)    │
-│  ├── Twelve Data (stock prices)                              │
-│  └── CoinGecko (crypto prices)                               │
-└─────────────────────────────────────────────────────────────┘
-```
+| Document | Description |
+|----------|-------------|
+| [README.md](../README.md) | Project overview and quick start |
+| [API.md](./API.md) | Complete API reference |
+| [SETUP.md](./SETUP.md) | Installation and deployment guide |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System design and data flow |
+| [LEARNING_SYSTEM.md](./LEARNING_SYSTEM.md) | AI learning and calibration |
+| [CHANGELOG.md](./CHANGELOG.md) | Version history |
+| [CROSS_MARKETING_INTEGRATION.md](./CROSS_MARKETING_INTEGRATION.md) | CR AudioViz AI integration |
 
 ---
 
-## Features
+## 🚀 Quick Links
 
-### Core Features
+### Live Product
+- **Landing Page**: https://crav-market-oracle.vercel.app
+- **Dashboard**: https://crav-market-oracle.vercel.app/ai-picks
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| AI Pick Generation | ✅ Complete | 5 AIs generate picks weekly |
-| Real-Time Prices | ✅ Complete | 15-min updates via APIs |
-| P&L Tracking | ✅ Complete | Accurate profit/loss display |
-| AI Leaderboard | ✅ Complete | Performance rankings |
-| Help Center | ✅ Complete | Comprehensive documentation |
-| Javari Chat | ✅ Complete | AI assistant widget |
-| Mobile Nav | ✅ Complete | Bottom navigation |
-| Cross-Marketing | ✅ Complete | Ecosystem integration |
+### GitHub
+- **Repository**: https://github.com/CR-AudioViz-AI/crav-market-oracle
 
-### Pages
-
-| Route | Description | Status |
-|-------|-------------|--------|
-| `/` | Main dashboard with all picks | ✅ |
-| `/hot-picks` | Top performing picks | ✅ |
-| `/battle` | AI vs AI comparison | ✅ |
-| `/insights` | Market insights | ✅ |
-| `/learn` | Educational content | ✅ |
-| `/watchlist` | Personal watchlist | ✅ |
-| `/help` | Help center | ✅ |
-| `/help/getting-started` | Onboarding guide | ✅ |
-| `/help/how-it-works` | Platform explanation | ✅ |
-| `/help/ai-models` | AI model guide | ✅ |
-| `/help/understanding-picks` | Pick explanation | ✅ |
-| `/help/faq` | FAQ | ✅ |
-| `/stock/[ticker]` | Stock detail page | ✅ |
+### External
+- **Supabase Dashboard**: https://supabase.com/dashboard
+- **Vercel Dashboard**: https://vercel.com/dashboard
+- **Google AI Studio**: https://aistudio.google.com
 
 ---
 
-## API Reference
+## 🏗️ Project Structure
 
-### Generate Picks
 ```
-GET /api/market-oracle/generate-picks?trigger=manual
-```
-Generates 75 new picks (25 per category) using all 5 AI models.
-
-**Process:**
-1. Fetches real prices from Twelve Data (stocks) and CoinGecko (crypto)
-2. Calls each AI with current prices in prompt
-3. Parses responses and saves to database
-4. Entry price = actual market price (not AI suggestion)
-
-### Update Prices
-```
-GET /api/market-oracle/update-prices?trigger=manual
-```
-Updates all active picks with current market prices.
-
-**Sources:**
-- Stocks: Twelve Data API (800 calls/day free)
-- Crypto: CoinGecko API (unlimited, free)
-
-**Rate Limits:**
-- Twelve Data: 300ms between calls
-- CoinGecko: Batch requests (no limit)
-
-### Update Performance
-```
-GET /api/market-oracle/update-performance
-```
-Calculates win/loss status for picks that hit targets or stops.
-
----
-
-## Database Schema
-
-### Tables
-
-**ai_models**
-```sql
-id, name, provider, description, created_at
-```
-
-**competitions**
-```sql
-id, name, start_date, end_date, status, created_at
-```
-
-**stock_picks**
-```sql
-id, competition_id, ai_model_id, ticker, company_name, 
-entry_price, target_price, stop_loss, current_price,
-price_change, price_change_pct, direction, confidence,
-reasoning, category, status, created_at, last_price_update
-```
-
-**ai_call_logs**
-```sql
-id, ai_model_id, endpoint, status, response_time_ms, 
-error_message, created_at
+crav-market-oracle/
+├── app/                      # Next.js App Router
+│   ├── page.tsx              # Landing page
+│   ├── ai-picks/             # Dashboard
+│   └── api/                  # API routes
+├── lib/                      # Core logic
+│   ├── ai/                   # AI orchestration
+│   ├── learning/             # Calibration engine
+│   └── types/                # TypeScript definitions
+├── components/               # React components
+├── docs/                     # Documentation (you are here)
+├── supabase/                 # Database migrations
+└── public/                   # Static assets
 ```
 
 ---
 
-## Cron Jobs
+## 🤖 AI Models
 
-Configured in `vercel.json`:
-
-| Schedule | Path | Description |
-|----------|------|-------------|
-| `0 8 * * 0` | /api/market-oracle/generate-picks | Sunday 8 AM - Generate picks |
-| `*/15 9-16 * * 1-5` | /api/market-oracle/update-prices | Mon-Fri 9AM-4PM - Update prices |
-| `0 */4 * * 0,6` | /api/market-oracle/update-prices | Weekends - Update crypto |
-
-**Authentication:** All cron endpoints require `CRON_SECRET` header.
+| Model | Provider | Status | Personality |
+|-------|----------|--------|-------------|
+| GPT-4 | OpenAI | ✅ Active | Conservative, thorough |
+| Claude | Anthropic | ⏳ Credits | Balanced, risk-aware |
+| Gemini | Google | ✅ Active | Technical, pattern-focused |
+| Perplexity | Perplexity AI | ✅ Active | Real-time, news-driven |
+| **Javari** | CR AudioViz | ✅ Active | Consensus engine |
 
 ---
 
-## Deployment
+## 📊 Key Features
 
-### Environment Variables
+### Pick Generation
+- Real-time market data
+- Parallel AI analysis
+- Direction + confidence + targets
+- Factor assessments
+- Risk/catalyst identification
 
-```env
-# Required
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
-OPENAI_API_KEY=sk-xxx
-ANTHROPIC_API_KEY=sk-ant-xxx
-GEMINI_API_KEY=xxx
-PERPLEXITY_API_KEY=pplx-xxx
-TWELVE_DATA_API_KEY=xxx
-CRON_SECRET=xxx
-```
+### Javari Consensus
+- Weighted voting
+- Accuracy-based weights
+- Sector-specific calibration
+- Unified verdict
 
-### Deploy Process
-
-1. Push to GitHub (auto-triggers Vercel)
-2. Preview deployment created
-3. Manual promotion to production
-4. Verify via production URL
+### Learning Pipeline
+- Outcome tracking
+- Accuracy measurement
+- Factor performance
+- Continuous improvement
 
 ---
 
-## Troubleshooting
+## 🔑 Environment Variables
 
-### Common Issues
-
-**AI not generating picks:**
-- Check API key validity
-- Verify rate limits not exceeded
-- Check AI call logs in database
-
-**Prices not updating:**
-- Verify Twelve Data API key
-- Check rate limiting (800 calls/day)
-- Confirm market hours (9 AM - 4 PM EST)
-
-**Wrong P&L calculations:**
-- Entry price should equal current at creation
-- Verify price_change_pct formula
-- Check for NULL values
-
-### Health Checks
+Required for production:
 
 ```bash
-# Test generate picks
-curl "https://crav-market-oracle.vercel.app/api/market-oracle/generate-picks?trigger=manual"
+# Database
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
-# Test price update
-curl "https://crav-market-oracle.vercel.app/api/market-oracle/update-prices?trigger=manual"
+# AI Providers (at least one required)
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GEMINI_API_KEY=
+PERPLEXITY_API_KEY=
+
+# Market Data
+ALPHA_VANTAGE_API_KEY=
 ```
 
+See [SETUP.md](./SETUP.md) for detailed configuration.
+
 ---
 
-## Support
+## 📡 API Overview
 
-- **Help Center**: /help
-- **Javari AI**: Chat widget (bottom right)
+### Generate Picks
+```bash
+POST /api/ai-picks/generate
+{"symbol": "AAPL"}
+```
+
+### Get History
+```bash
+GET /api/ai-picks/generate?limit=20
+```
+
+### Track Outcomes
+```bash
+GET /api/outcomes
+POST /api/outcomes
+```
+
+See [API.md](./API.md) for complete reference.
+
+---
+
+## 🗄️ Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `market_oracle_picks` | Individual AI predictions |
+| `market_oracle_consensus_picks` | Javari verdicts |
+| `ai_accuracy_tracking` | Performance metrics |
+| `factor_performance` | Factor calibration |
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for schema details.
+
+---
+
+## 💰 Monetization
+
+### Planned Tiers
+- **Free**: 3 analyses/day
+- **Pro** ($29/mo): Unlimited, all AIs
+- **Enterprise** ($199/mo): API access, white-label
+
+### Revenue Streams
+1. SaaS subscriptions
+2. API access fees
+3. White-label licensing
+4. Premium alerts
+
+---
+
+## 🔒 Security
+
+- API keys in environment variables
+- Supabase Row Level Security
+- No credentials in repository
+- Rate limiting (planned)
+
+---
+
+## 📞 Support
+
+- **Company**: CR AudioViz AI, LLC
+- **Website**: https://craudiovizai.com
 - **Email**: support@craudiovizai.com
-- **Main Site**: https://craudiovizai.com
 
 ---
 
-© 2025 CR AudioViz AI, LLC. All rights reserved.
+## 📝 Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Make changes
+4. Submit pull request
+
+---
+
+**Built with ❤️ by CR AudioViz AI**
+
+*Your Story. Our Design.*
