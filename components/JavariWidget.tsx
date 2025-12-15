@@ -205,3 +205,19 @@ export default function JavariWidget() {
     </div>
   );
 }
+
+
+// Helper button component for other pages
+export function JavariHelpButton({ context }: { context?: string }) {
+  return (
+    <button
+      onClick={() => triggerJavariHelp({ page: context || 'general', action: 'help' })}
+      className="fixed bottom-4 right-4 w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg hover:shadow-amber-500/25 transition-all hover:scale-105 z-40"
+      title="Ask Javari for help"
+    >
+      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </button>
+  );
+}
