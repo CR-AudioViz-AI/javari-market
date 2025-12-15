@@ -1,6 +1,7 @@
 // lib/learning/outcome-tracker.ts
 // Market Oracle Ultimate - Outcome Tracking System
 // Created: December 14, 2025
+// Updated: December 14, 2025 - Fixed column names for factor_outcomes table
 // Purpose: Track pick outcomes for AI learning and calibration
 
 import { createClient } from '@supabase/supabase-js';
@@ -29,13 +30,6 @@ interface PickRecord {
   created_at: string;
   expires_at: string;
   sector: string;
-}
-
-interface PriceData {
-  symbol: string;
-  currentPrice: number;
-  highSinceEntry: number;
-  lowSinceEntry: number;
 }
 
 // Fetch current price from Alpha Vantage
@@ -71,7 +65,6 @@ function determineOutcome(
   let hitStopLoss = false;
   
   if (pick.direction === 'UP') {
-    // For UP picks: WIN if price >= target, LOSS if price <= stop
     if (currentPrice >= targetPrice) {
       outcome = 'WIN';
       hitTarget = true;
@@ -79,13 +72,11 @@ function determineOutcome(
       outcome = 'LOSS';
       hitStopLoss = true;
     } else if (currentPrice > entryPrice) {
-      // Price moved up but didn't hit target - partial win
       outcome = actualReturn >= 2 ? 'WIN' : 'EXPIRED';
     } else {
       outcome = 'LOSS';
     }
   } else if (pick.direction === 'DOWN') {
-    // For DOWN picks: WIN if price <= target, LOSS if price >= stop
     if (currentPrice <= targetPrice) {
       outcome = 'WIN';
       hitTarget = true;
@@ -101,9 +92,9 @@ function determineOutcome(
     // HOLD picks - check if staying flat was correct
     const priceChange = Math.abs(actualReturn);
     if (priceChange <= 3) {
-      outcome = 'WIN'; // Price stayed relatively flat
+      outcome = 'WIN';
     } else {
-      outcome = 'LOSS'; // Missed a significant move
+      outcome = 'LOSS';
     }
   }
   
@@ -113,30 +104,39 @@ function determineOutcome(
 // Record factor outcomes for learning
 async function recordFactorOutcomes(
   pick: PickRecord,
-  outcome: PickOutcome
+  outcome: PickOutcome,
+  actualReturn: number
 ): Promise<void> {
-  if (!pick.factor_assessments || pick.factor_assessments.length === 0) return;
+  if (!pick.factor_assessments || pick.factor_assessments.length === 0) {
+    console.log('No factor assessments to record for pick', pick.id);
+    return;
+  }
   
+  console.log(`Recording ${pick.factor_assessments.length} factor outcomes for pick ${pick.id}`);
+  
+  // Use correct column names matching the table schema
   const factorRecords = pick.factor_assessments.map(factor => ({
     pick_id: pick.id,
     ai_model: pick.ai_model,
     factor_id: factor.factorId,
     factor_name: factor.factorName,
-    factor_interpretation: factor.interpretation,
-    factor_confidence: factor.confidence,
-    pick_direction: pick.direction,
-    pick_outcome: outcome,
-    sector: pick.sector,
-    symbol: pick.symbol,
+    interpretation: factor.interpretation,  // Not factor_interpretation
+    confidence: factor.confidence,           // Not factor_confidence
+    outcome: outcome,                        // Not pick_outcome
+    actual_return: actualReturn,
+    sector: pick.sector || 'Unknown',
     created_at: new Date().toISOString(),
   }));
   
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('market_oracle_factor_outcomes')
-    .insert(factorRecords);
+    .insert(factorRecords)
+    .select();
   
   if (error) {
     console.error('Error recording factor outcomes:', error);
+  } else {
+    console.log('Successfully recorded factor outcomes:', data?.length || 0);
   }
 }
 
@@ -145,13 +145,12 @@ async function updateConsensusStats(
   pick: PickRecord,
   outcome: PickOutcome
 ): Promise<void> {
-  // Find consensus records that include this pick
+  // Find consensus records that include this pick's symbol
   const { data: consensusRecords } = await supabase
     .from('market_oracle_consensus_picks')
     .select('*')
     .eq('symbol', pick.symbol)
-    .eq('status', 'PENDING')
-    .gte('created_at', pick.created_at);
+    .eq('status', 'PENDING');
   
   if (!consensusRecords || consensusRecords.length === 0) return;
   
@@ -213,7 +212,6 @@ export async function processExpiredPicks(): Promise<{
   const results = { processed: 0, wins: 0, losses: 0, expired: 0, errors: [] as string[] };
   
   try {
-    // Get all pending picks that have expired
     const now = new Date().toISOString();
     const { data: expiredPicks, error: fetchError } = await supabase
       .from('market_oracle_picks')
@@ -230,7 +228,6 @@ export async function processExpiredPicks(): Promise<{
       return results;
     }
     
-    // Group picks by symbol to minimize API calls
     const symbolGroups = new Map<string, PickRecord[]>();
     for (const pick of expiredPicks) {
       const existing = symbolGroups.get(pick.symbol) || [];
@@ -238,7 +235,6 @@ export async function processExpiredPicks(): Promise<{
       symbolGroups.set(pick.symbol, existing);
     }
     
-    // Process each symbol
     for (const [symbol, picks] of symbolGroups) {
       const currentPrice = await getCurrentPrice(symbol);
       
@@ -251,7 +247,6 @@ export async function processExpiredPicks(): Promise<{
         try {
           const { outcome, hitTarget, hitStopLoss, actualReturn } = determineOutcome(pick, currentPrice);
           
-          // Update pick record
           const { error: updateError } = await supabase
             .from('market_oracle_picks')
             .update({
@@ -272,10 +267,7 @@ export async function processExpiredPicks(): Promise<{
             continue;
           }
           
-          // Record factor outcomes
-          await recordFactorOutcomes(pick, outcome);
-          
-          // Update consensus stats
+          await recordFactorOutcomes(pick, outcome, actualReturn);
           await updateConsensusStats(pick, outcome);
           
           results.processed++;
@@ -288,7 +280,6 @@ export async function processExpiredPicks(): Promise<{
         }
       }
       
-      // Rate limit Alpha Vantage API calls
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
@@ -325,7 +316,7 @@ export async function getPendingPicksStatus(): Promise<{
   };
 }
 
-// Force-resolve a pick for testing (simulates expiration)
+// Force-resolve a pick for testing
 export async function forceResolvePick(pickId: string): Promise<{
   success: boolean;
   outcome?: PickOutcome;
@@ -364,7 +355,7 @@ export async function forceResolvePick(pickId: string): Promise<{
       })
       .eq('id', pickId);
     
-    await recordFactorOutcomes(pick as PickRecord, outcome);
+    await recordFactorOutcomes(pick as PickRecord, outcome, actualReturn);
     await updateConsensusStats(pick as PickRecord, outcome);
     
     return { success: true, outcome };
