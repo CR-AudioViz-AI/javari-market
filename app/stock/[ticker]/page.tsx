@@ -56,7 +56,7 @@ interface Consensus {
   created_at: string;
 }
 
-const AI_INFO: Record<string, { name: string; color: string; icon: React.ReactNode; personality: string }> = {
+const AI_INFO: Record<string, { name: string; color: string; icon: JSX.Element; personality: string }> = {
   gpt4: { 
     name: 'GPT-4', 
     color: 'emerald', 
