@@ -13,19 +13,19 @@ import {
 // Types
 interface AIPick {
   id: string;
-  ai_model: string;
+  aiModel: string;
   symbol: string;
-  company_name: string;
+  companyName: string;
   sector: string;
   direction: 'UP' | 'DOWN' | 'HOLD';
   confidence: number;
   timeframe: string;
-  entry_price: number;
-  target_price: number;
-  stop_loss: number;
+  entryPrice: number;
+  targetPrice: number;
+  stopLoss: number;
   thesis: string;
-  full_reasoning: string;
-  factor_assessments?: Array<{
+  fullReasoning: string;
+  factorAssessments?: Array<{
     factorId: string;
     factorName: string;
     value: string;
@@ -33,13 +33,13 @@ interface AIPick {
     confidence: number;
     reasoning: string;
   }>;
-  key_bullish_factors: string[];
-  key_bearish_factors: string[];
+  keyBullishFactors: string[];
+  keyBearishFactors: string[];
   risks: string[];
   catalysts: string[];
   status: string;
-  actual_return?: number;
-  created_at: string;
+  actualReturn?: number;
+  createdAt: string;
 }
 
 interface ConsensusData {
@@ -159,7 +159,7 @@ function StockCard({
             </h3>
             {consensus && <DirectionBadge direction={consensus.consensusDirection} />}
           </div>
-          <p className="text-sm text-gray-400">{latestPick?.company_name || analysis.symbol}</p>
+          <p className="text-sm text-gray-400">{latestPick?.companyName || analysis.symbol}</p>
           <p className="text-xs text-gray-500">{latestPick?.sector}</p>
         </div>
         
@@ -191,7 +191,7 @@ function StockCard({
       {/* AI Pills */}
       <div className="flex flex-wrap gap-2 mb-4">
         {analysis.picks.map(pick => {
-          const config = AI_CONFIG[pick.ai_model] || AI_CONFIG.gpt4;
+          const config = AI_CONFIG[pick.aiModel] || AI_CONFIG.gpt4;
           return (
             <div 
               key={pick.id}
@@ -228,7 +228,7 @@ function StockCard({
 
 // Individual AI Analysis Panel
 function AIAnalysisPanel({ pick }: { pick: AIPick }) {
-  const config = AI_CONFIG[pick.ai_model] || AI_CONFIG.gpt4;
+  const config = AI_CONFIG[pick.aiModel] || AI_CONFIG.gpt4;
   const [showFull, setShowFull] = useState(false);
   
   return (
@@ -257,23 +257,23 @@ function AIAnalysisPanel({ pick }: { pick: AIPick }) {
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-gray-900/50 rounded-lg p-3 text-center">
             <div className="text-xs text-gray-500 mb-1">Entry</div>
-            <div className="text-lg font-semibold text-gray-300">${pick.entry_price?.toFixed(2)}</div>
+            <div className="text-lg font-semibold text-gray-300">${pick.entryPrice?.toFixed(2)}</div>
           </div>
           <div className="bg-emerald-500/10 rounded-lg p-3 text-center border border-emerald-500/20">
             <div className="text-xs text-emerald-400 mb-1">Target</div>
-            <div className="text-lg font-semibold text-emerald-300">${pick.target_price?.toFixed(2)}</div>
-            {pick.entry_price && pick.target_price && (
+            <div className="text-lg font-semibold text-emerald-300">${pick.targetPrice?.toFixed(2)}</div>
+            {pick.entryPrice && pick.targetPrice && (
               <div className="text-xs text-emerald-500">
-                +{((pick.target_price - pick.entry_price) / pick.entry_price * 100).toFixed(1)}%
+                +{((pick.targetPrice - pick.entryPrice) / pick.entryPrice * 100).toFixed(1)}%
               </div>
             )}
           </div>
           <div className="bg-red-500/10 rounded-lg p-3 text-center border border-red-500/20">
             <div className="text-xs text-red-400 mb-1">Stop Loss</div>
-            <div className="text-lg font-semibold text-red-300">${pick.stop_loss?.toFixed(2)}</div>
-            {pick.entry_price && pick.stop_loss && (
+            <div className="text-lg font-semibold text-red-300">${pick.stopLoss?.toFixed(2)}</div>
+            {pick.entryPrice && pick.stopLoss && (
               <div className="text-xs text-red-500">
-                {((pick.stop_loss - pick.entry_price) / pick.entry_price * 100).toFixed(1)}%
+                {((pick.stopLoss - pick.entryPrice) / pick.entryPrice * 100).toFixed(1)}%
               </div>
             )}
           </div>
@@ -301,20 +301,20 @@ function AIAnalysisPanel({ pick }: { pick: AIPick }) {
         </button>
         {showFull && (
           <div className="mt-3 p-3 bg-gray-900/50 rounded-lg">
-            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{pick.full_reasoning}</p>
+            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{pick.fullReasoning}</p>
           </div>
         )}
       </div>
       
       {/* Bullish/Bearish Factors */}
       <div className="p-4 grid md:grid-cols-2 gap-4">
-        {pick.key_bullish_factors?.length > 0 && (
+        {pick.keyBullishFactors?.length > 0 && (
           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
             <h5 className="text-sm font-semibold text-emerald-400 mb-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" /> Bullish Factors
             </h5>
             <ul className="space-y-1.5">
-              {pick.key_bullish_factors.map((factor, i) => (
+              {pick.keyBullishFactors.map((factor, i) => (
                 <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
                   <span className="text-emerald-500 mt-0.5">•</span>
                   {factor}
@@ -324,13 +324,13 @@ function AIAnalysisPanel({ pick }: { pick: AIPick }) {
           </div>
         )}
         
-        {pick.key_bearish_factors?.length > 0 && (
+        {pick.keyBearishFactors?.length > 0 && (
           <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3">
             <h5 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2">
               <TrendingDown className="w-4 h-4" /> Bearish Factors
             </h5>
             <ul className="space-y-1.5">
-              {pick.key_bearish_factors.map((factor, i) => (
+              {pick.keyBearishFactors.map((factor, i) => (
                 <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">•</span>
                   {factor}
@@ -375,7 +375,7 @@ function AIAnalysisPanel({ pick }: { pick: AIPick }) {
       {/* Timestamp */}
       <div className="px-4 pb-3 text-xs text-gray-500 flex items-center gap-1">
         <Clock className="w-3 h-3" />
-        Analyzed {new Date(pick.created_at).toLocaleDateString()} at {new Date(pick.created_at).toLocaleTimeString()}
+        Analyzed {new Date(pick.createdAt).toLocaleDateString()} at {new Date(pick.createdAt).toLocaleTimeString()}
       </div>
     </div>
   );
@@ -406,7 +406,7 @@ function StockDetailModal({
                 <DirectionBadge direction={analysis.consensus.consensusDirection} size="lg" />
               )}
             </div>
-            <p className="text-gray-400">{analysis.picks[0]?.company_name}</p>
+            <p className="text-gray-400">{analysis.picks[0]?.companyName}</p>
           </div>
           <button 
             onClick={onClose}
@@ -448,13 +448,13 @@ function StockDetailModal({
             All AI Analyses ({analysis.picks.length})
           </button>
           {analysis.picks.map(pick => {
-            const config = AI_CONFIG[pick.ai_model] || AI_CONFIG.gpt4;
+            const config = AI_CONFIG[pick.aiModel] || AI_CONFIG.gpt4;
             return (
               <button
                 key={pick.id}
-                onClick={() => setActiveTab(pick.ai_model)}
+                onClick={() => setActiveTab(pick.aiModel)}
                 className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-                  activeTab === pick.ai_model 
+                  activeTab === pick.aiModel 
                     ? 'border-amber-500 text-amber-400' 
                     : 'border-transparent text-gray-400 hover:text-white'
                 }`}
@@ -474,7 +474,7 @@ function StockDetailModal({
             ))
           ) : (
             analysis.picks
-              .filter(p => p.ai_model === activeTab)
+              .filter(p => p.aiModel === activeTab)
               .map(pick => (
                 <AIAnalysisPanel key={pick.id} pick={pick} />
               ))
@@ -667,7 +667,7 @@ export default function AIDashboard() {
       if (!grouped[pick.symbol]) {
         grouped[pick.symbol] = {
           symbol: pick.symbol,
-          companyName: pick.company_name,
+          companyName: pick.companyName,
           sector: pick.sector,
           picks: [],
           consensus: consensusData?.[pick.symbol] || null
@@ -677,8 +677,8 @@ export default function AIDashboard() {
     }
     
     return Object.values(grouped).sort((a, b) => {
-      const aTime = new Date(a.picks[0]?.created_at || 0).getTime();
-      const bTime = new Date(b.picks[0]?.created_at || 0).getTime();
+      const aTime = new Date(a.picks[0]?.createdAt || 0).getTime();
+      const bTime = new Date(b.picks[0]?.createdAt || 0).getTime();
       return bTime - aTime;
     });
   }, []);
@@ -739,7 +739,7 @@ export default function AIDashboard() {
       // Create new analysis from response
       const newAnalysis: StockAnalysis = {
         symbol: targetSymbol,
-        companyName: data.picks?.[0]?.company_name || targetSymbol,
+        companyName: data.picks?.[0]?.companyName || targetSymbol,
         sector: data.picks?.[0]?.sector || 'Unknown',
         picks: data.picks || [],
         consensus: data.consensus || null
@@ -877,3 +877,4 @@ export default function AIDashboard() {
     </div>
   );
 }
+
