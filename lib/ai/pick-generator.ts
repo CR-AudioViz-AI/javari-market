@@ -1,3 +1,8 @@
+// lib/ai/pick-generator.ts
+// Market Oracle Ultimate - AI Pick Generator with Multi-Model Support
+// Created: December 13, 2025
+// Updated: December 14, 2025 - Added Claude & Gemini support with graceful fallbacks
+
 import { createClient } from '@supabase/supabase-js';
 import type { AIModelName, AIPick, PickDirection, ConsensusAssessment } from '../types/learning';
 import { getLatestCalibration } from '../learning/calibration-engine';
@@ -8,11 +13,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const AI_CONFIGS = {
-  gpt4: { model: 'gpt-4-turbo-preview', enabled: true },
-  claude: { model: 'claude-3-sonnet-20240229', enabled: false },
-  gemini: { model: 'gemini-1.5-flash', enabled: false },
-  perplexity: { model: 'sonar', enabled: true },
+// AI Configuration - toggle enabled/disabled here
+const AI_CONFIGS: Record<string, { model: string; enabled: boolean; name: string }> = {
+  gpt4: { model: 'gpt-4-turbo-preview', enabled: true, name: 'GPT-4' },
+  claude: { model: 'claude-3-sonnet-20240229', enabled: true, name: 'Claude' }, // Will gracefully fail if no credits
+  gemini: { model: 'gemini-1.5-flash', enabled: true, name: 'Gemini' }, // Will gracefully fail if 403
+  perplexity: { model: 'sonar', enabled: true, name: 'Perplexity' },
 };
 
 interface MarketData {
@@ -72,14 +78,14 @@ function buildPrompt(m: MarketData, cal: { bestSectors: string[]; worstSectors: 
 
 async function callGPT4(prompt: string): Promise<string | null> {
   const key = process.env.OPENAI_API_KEY;
-  if (!key) return null;
+  if (!key) { console.log('GPT4: No API key'); return null; }
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({ model: 'gpt-4-turbo-preview', messages: [{ role: 'user', content: prompt }], max_tokens: 2000, temperature: 0.3 }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) { console.log('GPT4 HTTP error:', r.status); return null; }
     const d = await r.json();
     return d.choices[0].message.content;
   } catch (err) { 
@@ -88,16 +94,66 @@ async function callGPT4(prompt: string): Promise<string | null> {
   }
 }
 
+async function callClaude(prompt: string): Promise<string | null> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) { console.log('Claude: No API key'); return null; }
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({ 
+        model: 'claude-3-sonnet-20240229', 
+        max_tokens: 2000, 
+        messages: [{ role: 'user', content: prompt }] 
+      }),
+    });
+    const d = await r.json();
+    if (d.error) {
+      console.log('Claude API error:', d.error.type, '-', d.error.message);
+      return null;
+    }
+    return d.content?.[0]?.text || null;
+  } catch (err) { 
+    console.error('Claude error:', err);
+    return null; 
+  }
+}
+
+async function callGemini(prompt: string): Promise<string | null> {
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (!key) { console.log('Gemini: No API key'); return null; }
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    });
+    const d = await r.json();
+    if (d.error) {
+      console.log('Gemini API error:', d.error.code, '-', d.error.message);
+      return null;
+    }
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch (err) { 
+    console.error('Gemini error:', err);
+    return null; 
+  }
+}
+
 async function callPerplexity(prompt: string): Promise<string | null> {
   const key = process.env.PERPLEXITY_API_KEY;
-  if (!key) return null;
+  if (!key) { console.log('Perplexity: No API key'); return null; }
   try {
     const r = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({ model: 'sonar', messages: [{ role: 'user', content: prompt }], max_tokens: 2000, temperature: 0.3 }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) { console.log('Perplexity HTTP error:', r.status); return null; }
     const d = await r.json();
     return d.choices[0].message.content;
   } catch (err) { 
@@ -130,46 +186,24 @@ function parsePick(res: string, ai: AIModelName, m: MarketData): AIPick | null {
 
 function toDb(p: AIPick): Record<string, unknown> {
   return {
-    id: p.id, 
-    ai_model: p.aiModel, 
-    symbol: p.symbol, 
-    company_name: p.companyName, 
-    sector: p.sector,
-    direction: p.direction, 
-    confidence: p.confidence, 
-    timeframe: p.timeframe,
-    entry_price: p.entryPrice, 
-    target_price: p.targetPrice, 
-    stop_loss: p.stopLoss,
-    thesis: p.thesis, 
-    full_reasoning: p.fullReasoning, 
-    factor_assessments: p.factorAssessments,
-    key_bullish_factors: p.keyBullishFactors, 
-    key_bearish_factors: p.keyBearishFactors,
-    risks: p.risks, 
-    catalysts: p.catalysts, 
-    created_at: p.createdAt.toISOString(),
-    expires_at: p.expiresAt.toISOString(), 
-    status: p.status,
+    id: p.id, ai_model: p.aiModel, symbol: p.symbol, company_name: p.companyName, sector: p.sector,
+    direction: p.direction, confidence: p.confidence, timeframe: p.timeframe,
+    entry_price: p.entryPrice, target_price: p.targetPrice, stop_loss: p.stopLoss,
+    thesis: p.thesis, full_reasoning: p.fullReasoning, factor_assessments: p.factorAssessments,
+    key_bullish_factors: p.keyBullishFactors, key_bearish_factors: p.keyBearishFactors,
+    risks: p.risks, catalysts: p.catalysts, created_at: p.createdAt.toISOString(),
+    expires_at: p.expiresAt.toISOString(), status: p.status,
   };
 }
 
 async function savePickToDb(pick: AIPick): Promise<{ success: boolean; error?: string }> {
   try {
     const dbData = toDb(pick);
-    console.log('Saving pick to DB:', JSON.stringify(dbData, null, 2));
-    
-    const { data, error } = await supabase
-      .from('market_oracle_picks')
-      .insert(dbData)
-      .select();
-    
+    const { error } = await supabase.from('market_oracle_picks').insert(dbData).select();
     if (error) {
-      console.error('Supabase insert error:', error);
+      console.error('DB insert error:', error);
       return { success: false, error: error.message };
     }
-    
-    console.log('Pick saved successfully:', data);
     return { success: true };
   } catch (err) {
     console.error('Save pick error:', err);
@@ -196,19 +230,11 @@ async function saveConsensusToDb(symbol: string, consensus: ConsensusAssessment)
       created_at: new Date().toISOString(),
     };
     
-    console.log('Saving consensus to DB:', JSON.stringify(dbData, null, 2));
-    
-    const { data, error } = await supabase
-      .from('market_oracle_consensus_picks')
-      .insert(dbData)
-      .select();
-    
+    const { error } = await supabase.from('market_oracle_consensus_picks').insert(dbData).select();
     if (error) {
-      console.error('Supabase consensus insert error:', error);
+      console.error('Consensus insert error:', error);
       return { success: false, error: error.message };
     }
-    
-    console.log('Consensus saved successfully:', data);
     return { success: true };
   } catch (err) {
     console.error('Save consensus error:', err);
@@ -217,35 +243,81 @@ async function saveConsensusToDb(symbol: string, consensus: ConsensusAssessment)
 }
 
 export async function generatePickFromAI(ai: Exclude<AIModelName, 'javari'>, sym: string): Promise<AIPick | null> {
-  if (!AI_CONFIGS[ai].enabled) return null;
+  if (!AI_CONFIGS[ai]?.enabled) {
+    console.log(`${ai} is disabled`);
+    return null;
+  }
+  
   const m = await getMarketData(sym);
-  if (!m) return null;
+  if (!m) {
+    console.log(`No market data for ${sym}`);
+    return null;
+  }
+  
   const cal = await getLatestCalibration(ai);
   const prompt = buildPrompt(m, cal);
-  let res: string | null = null;
-  if (ai === 'gpt4') res = await callGPT4(prompt);
-  else if (ai === 'perplexity') res = await callPerplexity(prompt);
-  if (!res) return null;
-  const pick = parsePick(res, ai, m);
-  if (!pick) return null;
   
-  // Save to database with error handling
+  let res: string | null = null;
+  
+  switch (ai) {
+    case 'gpt4':
+      res = await callGPT4(prompt);
+      break;
+    case 'claude':
+      res = await callClaude(prompt);
+      break;
+    case 'gemini':
+      res = await callGemini(prompt);
+      break;
+    case 'perplexity':
+      res = await callPerplexity(prompt);
+      break;
+  }
+  
+  if (!res) {
+    console.log(`No response from ${ai}`);
+    return null;
+  }
+  
+  const pick = parsePick(res, ai, m);
+  if (!pick) {
+    console.log(`Failed to parse ${ai} response`);
+    return null;
+  }
+  
   const saveResult = await savePickToDb(pick);
   if (!saveResult.success) {
-    console.error(`Failed to save ${ai} pick to DB:`, saveResult.error);
+    console.error(`Failed to save ${ai} pick:`, saveResult.error);
   }
   
   return pick;
 }
 
-export async function generateAllAIPicks(symbol: string): Promise<{ picks: AIPick[]; consensus: ConsensusAssessment | null; dbErrors: string[] }> {
+export async function generateAllAIPicks(symbol: string): Promise<{ 
+  picks: AIPick[]; 
+  consensus: ConsensusAssessment | null; 
+  dbErrors: string[];
+  aiStatus: Record<string, string>;
+}> {
   const picks: AIPick[] = [];
   const dbErrors: string[] = [];
+  const aiStatus: Record<string, string> = {};
   
-  for (const ai of ['gpt4', 'perplexity'] as const) {
-    if (AI_CONFIGS[ai].enabled) {
+  // Try all enabled AIs
+  const aiModels: Array<Exclude<AIModelName, 'javari'>> = ['gpt4', 'claude', 'gemini', 'perplexity'];
+  
+  for (const ai of aiModels) {
+    if (AI_CONFIGS[ai]?.enabled) {
+      console.log(`Generating ${ai} pick for ${symbol}...`);
       const p = await generatePickFromAI(ai, symbol);
-      if (p) picks.push(p);
+      if (p) {
+        picks.push(p);
+        aiStatus[ai] = 'success';
+      } else {
+        aiStatus[ai] = 'failed';
+      }
+    } else {
+      aiStatus[ai] = 'disabled';
     }
   }
   
@@ -262,5 +334,5 @@ export async function generateAllAIPicks(symbol: string): Promise<{ picks: AIPic
     }
   }
   
-  return { picks, consensus, dbErrors };
+  return { picks, consensus, dbErrors, aiStatus };
 }
