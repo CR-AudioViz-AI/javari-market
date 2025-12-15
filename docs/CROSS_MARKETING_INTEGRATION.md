@@ -1,146 +1,277 @@
-# CROSS-MARKETING & HELP SYSTEM INTEGRATION GUIDE
+# Market Oracle AI - Cross-Marketing & Integration
 
-## Files Created
+**Leverage the CR AudioViz AI Ecosystem**
 
-1. **components/CrossMarketingFooter.tsx** - Enhanced footer with:
-   - Links to CR AudioViz AI main site
-   - Links to other tools (Javari, 60+ tools, CRAIverse, Games)
-   - Help & Resources section
-   - Legal/Social links
-   - Investment disclaimer
-   - Company info
+Last Updated: December 15, 2025
 
-2. **components/HelpButton.tsx** - Floating help button with modal:
-   - Always accessible from bottom-right corner
-   - Quick start guide
-   - How it works explanation
-   - Understanding pick data
-   - Links to full documentation
+---
 
-3. **components/PromoBanner.tsx** - Top promotional banner:
-   - Highlights CR AudioViz AI ecosystem
-   - CTA to explore main site
-   - Dismissible
+## Overview
 
-4. **app/help/page.tsx** - Help documentation landing page:
-   - Getting Started guide
-   - How It Works
-   - AI Models explained
-   - Understanding Picks
-   - FAQ
-   - Contact Support
-   - Cross-promotion for other tools
+Market Oracle AI is part of the **CR AudioViz AI** ecosystem. This document outlines cross-marketing opportunities and integration points with other products.
 
-## Integration Steps
+---
 
-### Step 1: Add Components to Layout
+## CR AudioViz AI Ecosystem
 
-Edit `app/layout.tsx`:
+### Current Products
 
-```tsx
-import CrossMarketingFooter from '@/components/CrossMarketingFooter';
-import HelpButton from '@/components/HelpButton';
-import PromoBanner from '@/components/PromoBanner';
+| Product | Description | Integration Potential |
+|---------|-------------|----------------------|
+| **Market Oracle AI** | Multi-AI stock analysis | Core product |
+| **Javari AI** | Universal AI assistant | Powers consensus engine |
+| **CRAIverse** | Virtual world platform | In-app trading zones |
+| **60+ Creative Tools** | Design, audio, video | Report generation |
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" className="dark">
-      <body>
-        <PromoBanner />  {/* Add at top */}
-        <Navigation />
-        <main className="container mx-auto px-4 py-8 pt-24">
-          {children}
-        </main>
-        <CrossMarketingFooter />  {/* Replace existing footer */}
-        <HelpButton />  {/* Floating help button */}
-      </body>
-    </html>
-  );
+### Planned Integrations
+
+1. **Javari AI Chat** - Ask about stocks in natural language
+2. **CRAIverse Trading Floor** - Virtual stock trading
+3. **Newsletter Generator** - AI-powered market newsletters
+4. **Portfolio Tracker** - Track picks and performance
+
+---
+
+## Cross-Selling Opportunities
+
+### 1. From Main Website (craudiovizai.com)
+
+```html
+<!-- Homepage CTA -->
+<section class="market-oracle-promo">
+  <h2>AI-Powered Stock Analysis</h2>
+  <p>4 AI models. 1 consensus. Make smarter trades.</p>
+  <a href="https://crav-market-oracle.vercel.app">Try Market Oracle →</a>
+</section>
+```
+
+### 2. Within Other Tools
+
+Every tool in the ecosystem should have:
+- "Powered by Javari AI" badge
+- Link to Market Oracle in navigation
+- Cross-product upsell in pricing
+
+### 3. Email Marketing
+
+**Newsletter Topics:**
+- Weekly market analysis
+- Top AI picks of the week
+- AI accuracy report
+- New feature announcements
+
+### 4. Social Media
+
+**Content Calendar:**
+- Daily: Feature AI pick (with consent)
+- Weekly: Accuracy update
+- Monthly: Performance report
+- Quarterly: Product updates
+
+---
+
+## Widget Embeds
+
+### Pick Card Embed
+
+```html
+<iframe 
+  src="https://crav-market-oracle.vercel.app/embed/pick?symbol=AAPL"
+  width="400" 
+  height="300"
+  frameborder="0"
+></iframe>
+```
+
+### Consensus Badge
+
+```html
+<img 
+  src="https://crav-market-oracle.vercel.app/api/badge?symbol=AAPL"
+  alt="AAPL Javari Consensus"
+/>
+```
+
+*Note: Embed endpoints are planned features.*
+
+---
+
+## API for Partner Integration
+
+### Partner API (Planned)
+
+```bash
+# Partner-authenticated requests
+POST /api/v2/partner/picks
+Authorization: Bearer PARTNER_API_KEY
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",
+  "partner_id": "newsletter-xyz",
+  "attribution": true
 }
 ```
 
-### Step 2: Create Help Pages Directory
+### Revenue Share
 
-Create these files:
-- `app/help/page.tsx` (already created - landing page)
-- `app/help/getting-started/page.tsx`
-- `app/help/how-it-works/page.tsx`
-- `app/help/ai-models/page.tsx`
-- `app/help/understanding-picks/page.tsx`
-- `app/help/faq/page.tsx`
+| Partner Type | Revenue Share |
+|--------------|---------------|
+| Affiliate | 20% first year |
+| White-Label | 30% ongoing |
+| Enterprise | Custom |
 
-### Step 3: Add Help Links Throughout App
+---
 
-In component files where users might need help:
+## White-Label Options
 
-```tsx
-import { HelpCircle } from 'lucide-react';
-import Link from 'next/link';
+### 1. Embedded Dashboard
 
-// Add inline help links
-<Link 
-  href="/help/understanding-picks" 
-  className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1"
->
-  <HelpCircle className="w-4 h-4" />
-  What does this mean?
-</Link>
+Partners can embed Market Oracle in their platforms:
+
+```javascript
+// Partner integration
+MarketOracle.init({
+  partner: 'your-partner-id',
+  container: '#market-oracle-container',
+  theme: 'dark',
+  branding: false  // Hide CR AudioViz branding
+});
 ```
 
-### Step 4: Add Disclaimer Component
+### 2. API-Only
 
-Create `components/Disclaimer.tsx`:
+For trading platforms and newsletters:
+- Full API access
+- Custom rate limits
+- Dedicated support
 
-```tsx
-export default function Disclaimer() {
-  return (
-    <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mb-6">
-      <p className="text-yellow-200 text-sm font-medium mb-2">
-        ⚠️ Investment Disclaimer
-      </p>
-      <p className="text-slate-300 text-xs leading-relaxed">
-        This is NOT financial advice. AI predictions are experimental and for 
-        educational purposes only. Always consult a licensed financial advisor.
-      </p>
-    </div>
-  );
-}
+### 3. Full White-Label
+
+- Custom domain
+- Custom branding
+- Custom AI weights
+- Dedicated infrastructure
+
+---
+
+## Target Markets
+
+### Primary
+
+1. **Retail Traders** - Individual investors
+2. **Trading Communities** - Discord, forums
+3. **Financial Newsletters** - Stock picks
+4. **Investment Clubs** - Group analysis
+
+### Secondary
+
+1. **Financial Advisors** - Client reporting
+2. **Trading Platforms** - Feature integration
+3. **Education** - Trading courses
+4. **Media** - Market commentary
+
+---
+
+## Marketing Channels
+
+### Content Marketing
+- Blog posts on market analysis
+- AI trading guides
+- Case studies
+
+### SEO Keywords
+- "AI stock analysis"
+- "Multi-AI trading"
+- "Stock pick consensus"
+- "Automated stock analysis"
+
+### Paid Acquisition
+- Google Ads (finance keywords)
+- Reddit (r/wallstreetbets, r/stocks)
+- Twitter/X (FinTwit)
+
+### Partnerships
+- Trading educators
+- Finance YouTubers
+- Newsletter creators
+
+---
+
+## Pricing Strategy
+
+### Tiered Pricing
+
+| Tier | Price | Features |
+|------|-------|----------|
+| Free | $0 | 3 picks/day, 2 AIs |
+| Pro | $29/mo | Unlimited, all AIs, alerts |
+| Team | $99/mo | 5 users, API access |
+| Enterprise | $199/mo | White-label, custom |
+
+### Add-Ons
+- Historical data export: $10/mo
+- API calls beyond limit: $0.05/call
+- Priority support: $20/mo
+
+---
+
+## Tracking & Analytics
+
+### UTM Parameters
+
+Always use UTM parameters for cross-marketing:
+
+```
+https://crav-market-oracle.vercel.app?
+  utm_source=craudiovizai
+  &utm_medium=website
+  &utm_campaign=homepage_cta
 ```
 
-Add to dashboard and key pages.
+### Key Metrics
+- Conversion rate by source
+- Feature adoption
+- Revenue per channel
+- Churn by acquisition source
 
-## Benefits
+---
 
-✅ **Cross-Marketing:**
-- Every page promotes CR AudioViz AI main site
-- Links to 60+ tools drive traffic to other products
-- Footer builds brand awareness
-- Promo banner captures immediate attention
+## Legal Disclaimers
 
-✅ **Help System:**
-- Reduces support tickets
-- Improves user onboarding
-- Builds trust and credibility
-- Always accessible via floating button
+All marketing must include:
 
-✅ **Professional Polish:**
-- Enterprise-grade footer
-- Comprehensive documentation
-- Legal compliance (disclaimers)
-- Social proof (company info)
+> **Disclaimer**: Market Oracle AI provides AI-generated stock analysis for informational purposes only. This is not financial advice. Past performance does not guarantee future results. Always do your own research and consult a financial advisor before making investment decisions.
 
-## Next Steps
+---
 
-1. Upload all components to GitHub
-2. Deploy to Vercel
-3. Create actual help page content
-4. Add analytics to track help usage
-5. Create video tutorials
-6. Monitor user engagement with cross-marketing links
+## Brand Guidelines
 
-## Customization
+### Logo Usage
+- Use official Market Oracle logo
+- Maintain clear space
+- Don't modify colors
 
-- Update social media links in CrossMarketingFooter.tsx
-- Customize PromoBanner message seasonally
-- Add more help pages as needed
-- Integrate with existing support systems
+### Messaging
+- "4 AIs. 1 Verdict."
+- "Smarter trades with AI consensus"
+- "Powered by Javari AI"
+
+### Colors
+- Primary: Amber (#F59E0B)
+- Secondary: Orange (#F97316)
+- Dark: Gray-950 (#030712)
+
+---
+
+## Contact
+
+- **Partnerships**: partnerships@craudiovizai.com
+- **API Access**: api@craudiovizai.com
+- **Support**: support@craudiovizai.com
+
+---
+
+**CR AudioViz AI, LLC**
+
+*Your Story. Our Design.*
