@@ -207,11 +207,13 @@ export default function JavariWidget() {
 }
 
 
+}
+
 // Helper button component for other pages
-export function JavariHelpButton({ context }: { context?: string }) {
+export function JavariHelpButton({ topic, context }: { topic?: string; context?: string }) {
   return (
     <button
-      onClick={() => triggerJavariHelp({ page: context || 'general', action: 'help' })}
+      onClick={() => triggerJavariHelp({ page: topic || context || 'general', action: 'help' })}
       className="fixed bottom-4 right-4 w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg hover:shadow-amber-500/25 transition-all hover:scale-105 z-40"
       title="Ask Javari for help"
     >
