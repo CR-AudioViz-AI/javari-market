@@ -27,10 +27,18 @@ export async function GET(request: NextRequest) {
             return cookieStore.get(name)?.value;
           },
           set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options });
+            try {
+              cookieStore.set({ name, value, ...options });
+            } catch (e) {
+              // Can be ignored in certain contexts
+            }
           },
           remove(name: string, options: any) {
-            cookieStore.set({ name, value: '', ...options });
+            try {
+              cookieStore.set({ name, value: '', ...options });
+            } catch (e) {
+              // Can be ignored
+            }
           },
         },
       }
