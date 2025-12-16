@@ -1,44 +1,115 @@
-// ============================================================================
-// MARKET ORACLE - AUTH PROVIDER
-// Wraps app with centralized authentication context
-// Created: December 15, 2025
-// ============================================================================
-
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
-import { useAuth } from '@/lib/auth/useAuth';
-import type { User, Session } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { createSupabaseBrowserClient } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  loading: boolean;
   credits: number;
-  subscriptionTier: string;
-  signIn: (provider: 'google' | 'github' | 'apple' | 'azure' | 'discord') => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signInWithMagicLink: (email: string) => Promise<{ error: Error | null }>;
+  loading: boolean;
   signOut: () => Promise<void>;
   refreshCredits: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  session: null,
+  credits: 0,
+  loading: true,
+  signOut: async () => {},
+  refreshCredits: async () => {},
+});
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const auth = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [credits, setCredits] = useState(0);
+  const [loading, setLoading] = useState(true);
+  
+  const supabase = createSupabaseBrowserClient();
+
+  const refreshCredits = async () => {
+    if (!user) return;
+    
+    try {
+      const { data } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (data) {
+        setCredits(data.balance);
+      }
+    } catch (error) {
+      console.error('Error fetching credits:', error);
+    }
+  };
+
+  useEffect(() => {
+    const getSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Fetch credits after getting session
+          const { data } = await supabase
+            .from('user_credits')
+            .select('balance')
+            .eq('user_id', session.user.id)
+            .single();
+          if (data) setCredits(data.balance);
+        }
+      } catch (error) {
+        console.error('Error getting session:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          const { data } = await supabase
+            .from('user_credits')
+            .select('balance')
+            .eq('user_id', session.user.id)
+            .single();
+          if (data) setCredits(data.balance);
+        } else {
+          setCredits(0);
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setCredits(0);
+  };
 
   return (
-    <AuthContext.Provider value={auth}>
+    <AuthContext.Provider value={{ user, session, credits, loading, signOut, refreshCredits }}>
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuthContext() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuthContext must be used within an AuthProvider');
-  }
-  return context;
 }
