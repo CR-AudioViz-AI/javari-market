@@ -5,11 +5,13 @@ import { User, Session, AuthError } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
 
 type OAuthProvider = 'google' | 'github' | 'apple' | 'azure' | 'discord';
+type SubscriptionTier = 'free' | 'starter' | 'pro' | 'enterprise';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   credits: number;
+  subscriptionTier: SubscriptionTier;
   loading: boolean;
   signIn: (provider: OAuthProvider) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: AuthError | null }>;
@@ -22,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   credits: 0,
+  subscriptionTier: 'free',
   loading: true,
   signIn: async () => {},
   signInWithEmail: async () => ({ error: null }),
@@ -43,29 +46,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [credits, setCredits] = useState(0);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
   const [loading, setLoading] = useState(true);
   
   const supabase = createSupabaseBrowserClient();
 
-  const fetchCredits = async (userId: string) => {
+  const fetchUserData = async (userId: string) => {
     try {
-      const { data } = await supabase
+      // Fetch credits
+      const { data: creditsData } = await supabase
         .from('user_credits')
         .select('balance')
         .eq('user_id', userId)
         .single();
       
-      if (data) {
-        setCredits(data.balance);
+      if (creditsData) {
+        setCredits(creditsData.balance);
+      }
+
+      // Fetch subscription tier from profiles or subscriptions table
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', userId)
+        .single();
+      
+      if (profileData?.subscription_tier) {
+        setSubscriptionTier(profileData.subscription_tier as SubscriptionTier);
       }
     } catch (error) {
-      console.error('Error fetching credits:', error);
+      console.error('Error fetching user data:', error);
     }
   };
 
   const refreshCredits = async () => {
     if (user) {
-      await fetchCredits(user.id);
+      await fetchUserData(user.id);
     }
   };
 
@@ -77,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchCredits(session.user.id);
+          await fetchUserData(session.user.id);
         }
       } catch (error) {
         console.error('Error getting session:', error);
@@ -94,9 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchCredits(session.user.id);
+          await fetchUserData(session.user.id);
         } else {
           setCredits(0);
+          setSubscriptionTier('free');
         }
       }
     );
@@ -140,13 +157,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setCredits(0);
+    setSubscriptionTier('free');
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
       session, 
-      credits, 
+      credits,
+      subscriptionTier,
       loading, 
       signIn,
       signInWithEmail,
