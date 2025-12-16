@@ -1,10 +1,19 @@
 // ============================================================================
 // MARKET ORACLE - CENTRALIZED CREDITS INTEGRATION
 // All credit operations go through main CR AudioViz AI system
+// SERVER-SIDE ONLY - Use in API routes
 // Created: December 15, 2025
 // ============================================================================
 
-import { supabaseAdmin } from '../supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// Create admin client for credit operations
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kteobfyferrukqeolofj.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabaseAdmin = SUPABASE_SERVICE_KEY 
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  : null;
 
 // Credit costs for Market Oracle operations
 export const MARKET_ORACLE_COSTS = {
@@ -46,7 +55,7 @@ export async function deductCredits(
   // First check balance
   const { data: credits, error: checkError } = await supabaseAdmin
     .from('user_credits')
-    .select('balance')
+    .select('balance, lifetime_spent')
     .eq('user_id', userId)
     .single();
 
@@ -64,7 +73,7 @@ export async function deductCredits(
     .from('user_credits')
     .update({ 
       balance: newBalance,
-      lifetime_spent: credits.lifetime_spent + amount,
+      lifetime_spent: (credits.lifetime_spent || 0) + amount,
       updated_at: new Date().toISOString()
     })
     .eq('user_id', userId);
