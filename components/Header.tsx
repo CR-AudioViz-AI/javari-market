@@ -1,34 +1,32 @@
 // ============================================================================
-// MARKET ORACLE - STATIC HEADER
-// Shows on ALL pages with navigation to key sections
-// Fixed: 2025-12-17
+// MARKET ORACLE - BRANDED HEADER
+// Uses official logo + brand cyan/teal color scheme
+// Updated: 2025-12-17
 // ============================================================================
 
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { 
-  TrendingUp, 
-  Brain, 
-  Swords, 
-  Flame, 
   BarChart3,
+  Swords,
+  Flame,
+  Brain,
   Target,
   Menu,
   X,
-  Sparkles,
   LogIn,
-  User,
-  ChevronDown
+  Home
 } from 'lucide-react';
 import { useAuthContext } from '@/components/AuthProvider';
 import LoginModal from '@/components/LoginModal';
 import UserMenu from '@/components/UserMenu';
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Home', icon: TrendingUp },
+  { href: '/', label: 'Home', icon: Home },
   { href: '/ai-picks', label: 'Dashboard', icon: BarChart3 },
   { href: '/battle', label: 'AI Battle', icon: Swords },
   { href: '/hot-picks', label: 'Hot Picks', icon: Flame },
@@ -44,17 +42,27 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-gray-950/95 backdrop-blur-xl border-b border-gray-800">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#0a1929]/95 backdrop-blur-xl border-b border-cyan-500/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                <TrendingUp className="w-6 h-6 text-white" />
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="relative w-12 h-12 transition-transform group-hover:scale-105">
+                <Image
+                  src="/market-oracle-logo.png"
+                  alt="Market Oracle"
+                  width={48}
+                  height={48}
+                  className="object-contain mo-logo-glow"
+                  priority
+                />
               </div>
-              <div className="hidden sm:block">
-                <span className="text-xl font-bold text-white">Market Oracle</span>
-                <span className="ml-2 text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">AI</span>
+              <div className="hidden sm:flex flex-col">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-lg font-bold text-[#1B3A4B] dark:text-slate-200">MARKET</span>
+                  <span className="text-lg font-bold text-cyan-400">ORACLE</span>
+                </div>
+                <span className="text-[10px] text-gray-500 -mt-1">AI-Powered Stock Predictions</span>
               </div>
             </Link>
 
@@ -71,8 +79,8 @@ export default function Header() {
                     href={item.href}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-amber-500/20 text-amber-400'
-                        : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800/50'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -86,13 +94,13 @@ export default function Header() {
             <div className="flex items-center gap-3">
               {/* Auth Section */}
               {loading ? (
-                <div className="w-8 h-8 rounded-full bg-gray-800 animate-pulse" />
+                <div className="w-8 h-8 rounded-full bg-slate-800 animate-pulse" />
               ) : user ? (
                 <UserMenu />
               ) : (
                 <button
                   onClick={() => setShowLoginModal(true)}
-                  className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg hover:shadow-amber-500/25 transition-all text-sm"
+                  className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm"
                 >
                   <LogIn className="w-4 h-4" />
                   <span className="hidden sm:inline">Sign In</span>
@@ -102,7 +110,7 @@ export default function Header() {
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                 aria-label="Toggle menu"
               >
                 {mobileMenuOpen ? (
@@ -117,7 +125,7 @@ export default function Header() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-800 bg-gray-950/98 backdrop-blur-xl">
+          <div className="lg:hidden border-t border-cyan-500/20 bg-[#0a1929]/98 backdrop-blur-xl">
             <nav className="px-4 py-4 space-y-1">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
@@ -131,8 +139,8 @@ export default function Header() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-amber-500/20 text-amber-400'
-                        : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                        ? 'bg-cyan-500/20 text-cyan-400'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -142,25 +150,25 @@ export default function Header() {
               })}
               
               {/* Additional Mobile Links */}
-              <div className="border-t border-gray-800 mt-4 pt-4">
+              <div className="border-t border-cyan-500/20 mt-4 pt-4 space-y-1">
                 <Link
                   href="/backtesting"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800"
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-slate-800"
                 >
                   Backtesting
                 </Link>
                 <Link
                   href="/portfolio"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800"
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-slate-800"
                 >
                   Portfolio
                 </Link>
                 <Link
                   href="/watchlist"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800"
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-slate-800"
                 >
                   Watchlist
                 </Link>
