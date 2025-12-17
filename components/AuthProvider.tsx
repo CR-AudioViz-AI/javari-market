@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { User, Session, AuthError, SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
 
 type OAuthProvider = 'google' | 'github' | 'apple' | 'azure' | 'discord';
@@ -35,20 +35,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [credits, setCredits] = useState(0);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
   const [loading, setLoading] = useState(true);
-  const supabase = createSupabaseBrowserClient();
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
 
-  const fetchUserData = async (userId: string) => {
+  useEffect(() => {
+    const client = createSupabaseBrowserClient();
+    setSupabase(client);
+  }, []);
+
+  const fetchUserData = useCallback(async (userId: string) => {
+    if (!supabase) return;
     try {
       const { data: creditsData } = await supabase.from('user_credits').select('balance').eq('user_id', userId).single();
       if (creditsData) setCredits(creditsData.balance);
       const { data: profileData } = await supabase.from('profiles').select('subscription_tier').eq('id', userId).single();
       if (profileData?.subscription_tier) setSubscriptionTier(profileData.subscription_tier as SubscriptionTier);
     } catch (error) { console.error('Error fetching user data:', error); }
-  };
+  }, [supabase]);
 
-  const refreshCredits = async () => { if (user) await fetchUserData(user.id); };
+  const refreshCredits = useCallback(async () => { if (user) await fetchUserData(user.id); }, [user, fetchUserData]);
 
   useEffect(() => {
+    if (!supabase) return;
+
     const getSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -58,27 +66,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       finally { setLoading(false); }
     };
     getSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session); setUser(session?.user ?? null);
       if (session?.user) await fetchUserData(session.user.id);
       else { setCredits(0); setSubscriptionTier('free'); }
     });
     return () => { subscription.unsubscribe(); };
-  }, []);
+  }, [supabase, fetchUserData]);
 
-  const signIn = async (provider: OAuthProvider) => {
+  const signIn = useCallback(async (provider: OAuthProvider) => {
+    if (!supabase) return;
     const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/api/auth/callback` } });
     if (error) throw error;
-  };
-  const signInWithEmail = async (email: string, password: string) => {
+  }, [supabase]);
+
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    if (!supabase) return { error: { message: 'Not initialized' } as AuthError };
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
-  };
-  const signInWithMagicLink = async (email: string) => {
+  }, [supabase]);
+
+  const signInWithMagicLink = useCallback(async (email: string) => {
+    if (!supabase) return { error: { message: 'Not initialized' } as AuthError };
     const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` } });
     return { error };
-  };
-  const signOut = async () => { await supabase.auth.signOut(); setUser(null); setSession(null); setCredits(0); setSubscriptionTier('free'); };
+  }, [supabase]);
+
+  const signOut = useCallback(async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setUser(null); setSession(null); setCredits(0); setSubscriptionTier('free');
+  }, [supabase]);
 
   return (
     <AuthContext.Provider value={{ user, session, credits, subscriptionTier, loading, signIn, signInWithEmail, signInWithMagicLink, signOut, refreshCredits }}>
