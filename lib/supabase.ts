@@ -1,7 +1,7 @@
 // ============================================================================
 // MARKET ORACLE - COMPLETE SUPABASE CLIENT
-// ALL exports restored + centralized auth
-// Fixed: 2025-12-17 11:44 EST
+// ALL exports + snake_case aliases for backwards compatibility
+// Fixed: 2025-12-17 11:48 EST
 // ============================================================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -45,48 +45,66 @@ export function createSupabaseServerClient(): SupabaseClient {
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
 
 // ============================================================================
-// TYPES
+// TYPES - With snake_case aliases for backwards compatibility
 // ============================================================================
 
 export interface AIModel {
   id: string;
   name: string;
   displayName: string;
+  display_name?: string; // alias
   provider: string;
   color: string;
   description: string;
   strengths: string[];
   isActive: boolean;
+  is_active?: boolean; // alias
 }
 
 export interface StockPick {
   id: string;
   aiModelId: string;
+  ai_model_id?: string; // alias
   aiModel?: AIModel;
+  ai_model?: AIModel; // alias
   symbol: string;
   companyName: string;
+  company_name?: string; // alias
   sector: string;
   direction: 'UP' | 'DOWN' | 'HOLD';
   confidence: number;
+  // Price fields - both camelCase and snake_case
   entryPrice: number;
+  entry_price?: number; // alias
   targetPrice: number;
+  target_price?: number; // alias
   stopLoss: number;
+  stop_loss?: number; // alias
   timeframe: string;
   thesis: string;
   reasoning: string;
   keyBullishFactors: string[];
+  key_bullish_factors?: string[]; // alias
   keyBearishFactors: string[];
+  key_bearish_factors?: string[]; // alias
   risks: string[];
   catalysts: string[];
   status: 'active' | 'closed' | 'expired';
   actualExitPrice?: number;
+  actual_exit_price?: number; // alias
   actualReturn?: number;
+  actual_return?: number; // alias
   closedAt?: string;
+  closed_at?: string; // alias
   createdAt: string;
+  created_at?: string; // alias
   updatedAt: string;
-  // Additional fields for price tracking
+  updated_at?: string; // alias
+  // Price tracking fields
   current_price?: number;
+  currentPrice?: number; // alias
   price_change_percent?: number;
+  priceChangePercent?: number; // alias
 }
 
 export interface AIStatistics {
@@ -134,51 +152,106 @@ export const AI_MODELS: AIModel[] = [
     id: 'gpt4',
     name: 'gpt4',
     displayName: 'GPT-4',
+    display_name: 'GPT-4',
     provider: 'OpenAI',
     color: '#10B981',
     description: 'Conservative, thorough analysis with deep reasoning',
     strengths: ['Fundamental Analysis', 'Risk Assessment', 'Long-term Outlook'],
-    isActive: true
+    isActive: true,
+    is_active: true
   },
   {
     id: 'claude',
     name: 'claude',
     displayName: 'Claude',
+    display_name: 'Claude',
     provider: 'Anthropic',
     color: '#F59E0B',
     description: 'Balanced analysis with strong risk awareness',
     strengths: ['Risk Analysis', 'Market Context', 'Balanced View'],
-    isActive: true
+    isActive: true,
+    is_active: true
   },
   {
     id: 'gemini',
     name: 'gemini',
     displayName: 'Gemini',
+    display_name: 'Gemini',
     provider: 'Google',
     color: '#3B82F6',
     description: 'Technical patterns and price target focus',
     strengths: ['Technical Analysis', 'Price Targets', 'Pattern Recognition'],
-    isActive: true
+    isActive: true,
+    is_active: true
   },
   {
     id: 'perplexity',
     name: 'perplexity',
     displayName: 'Perplexity',
+    display_name: 'Perplexity',
     provider: 'Perplexity AI',
     color: '#8B5CF6',
     description: 'Real-time web data and breaking news integration',
     strengths: ['Real-time Data', 'News Analysis', 'Catalyst Identification'],
-    isActive: true
+    isActive: true,
+    is_active: true
   }
 ];
+
+// ============================================================================
+// HELPER: Normalize pick to have both camelCase and snake_case
+// ============================================================================
+
+function normalizePick(pick: any): StockPick {
+  return {
+    id: pick.id,
+    aiModelId: pick.ai_model_id || pick.aiModelId,
+    ai_model_id: pick.ai_model_id || pick.aiModelId,
+    aiModel: pick.ai_models || pick.aiModel,
+    ai_model: pick.ai_models || pick.aiModel,
+    symbol: pick.symbol,
+    companyName: pick.company_name || pick.companyName || pick.symbol,
+    company_name: pick.company_name || pick.companyName || pick.symbol,
+    sector: pick.sector || 'Unknown',
+    direction: pick.direction,
+    confidence: pick.confidence,
+    entryPrice: pick.entry_price || pick.entryPrice || 0,
+    entry_price: pick.entry_price || pick.entryPrice || 0,
+    targetPrice: pick.target_price || pick.targetPrice || 0,
+    target_price: pick.target_price || pick.targetPrice || 0,
+    stopLoss: pick.stop_loss || pick.stopLoss || 0,
+    stop_loss: pick.stop_loss || pick.stopLoss || 0,
+    timeframe: pick.timeframe || '1-3 months',
+    thesis: pick.thesis || '',
+    reasoning: pick.reasoning || '',
+    keyBullishFactors: pick.key_bullish_factors || pick.keyBullishFactors || [],
+    key_bullish_factors: pick.key_bullish_factors || pick.keyBullishFactors || [],
+    keyBearishFactors: pick.key_bearish_factors || pick.keyBearishFactors || [],
+    key_bearish_factors: pick.key_bearish_factors || pick.keyBearishFactors || [],
+    risks: pick.risks || [],
+    catalysts: pick.catalysts || [],
+    status: pick.status || 'active',
+    actualExitPrice: pick.actual_exit_price || pick.actualExitPrice,
+    actual_exit_price: pick.actual_exit_price || pick.actualExitPrice,
+    actualReturn: pick.actual_return || pick.actualReturn,
+    actual_return: pick.actual_return || pick.actualReturn,
+    closedAt: pick.closed_at || pick.closedAt,
+    closed_at: pick.closed_at || pick.closedAt,
+    createdAt: pick.created_at || pick.createdAt || new Date().toISOString(),
+    created_at: pick.created_at || pick.createdAt || new Date().toISOString(),
+    updatedAt: pick.updated_at || pick.updatedAt || new Date().toISOString(),
+    updated_at: pick.updated_at || pick.updatedAt || new Date().toISOString(),
+    current_price: pick.current_price || pick.currentPrice,
+    currentPrice: pick.current_price || pick.currentPrice,
+    price_change_percent: pick.price_change_percent || pick.priceChangePercent,
+    priceChangePercent: pick.price_change_percent || pick.priceChangePercent
+  };
+}
 
 // ============================================================================
 // CORE DATA FUNCTIONS
 // ============================================================================
 
-/**
- * Get all AI models
- */
 export async function getAIModels(): Promise<AIModel[]> {
   try {
     const { data, error } = await supabase
@@ -192,11 +265,13 @@ export async function getAIModels(): Promise<AIModel[]> {
         id: m.id,
         name: m.name,
         displayName: m.display_name,
+        display_name: m.display_name,
         provider: m.provider,
         color: m.color,
         description: m.description,
         strengths: m.strengths || [],
-        isActive: m.is_active
+        isActive: m.is_active,
+        is_active: m.is_active
       }));
     }
   } catch (e) {
@@ -205,9 +280,6 @@ export async function getAIModels(): Promise<AIModel[]> {
   return AI_MODELS;
 }
 
-/**
- * Get stock picks with optional filters
- */
 export async function getPicks(filters?: {
   aiModelId?: string;
   symbol?: string;
@@ -246,69 +318,27 @@ export async function getPicks(filters?: {
       return [];
     }
     
-    return (data || []).map(pick => ({
-      id: pick.id,
-      aiModelId: pick.ai_model_id,
-      aiModel: pick.ai_models ? {
-        id: pick.ai_models.id,
-        name: pick.ai_models.name,
-        displayName: pick.ai_models.display_name,
-        provider: pick.ai_models.provider,
-        color: pick.ai_models.color,
-        description: pick.ai_models.description,
-        strengths: pick.ai_models.strengths || [],
-        isActive: pick.ai_models.is_active
-      } : undefined,
-      symbol: pick.symbol,
-      companyName: pick.company_name || pick.symbol,
-      sector: pick.sector || 'Unknown',
-      direction: pick.direction,
-      confidence: pick.confidence,
-      entryPrice: pick.entry_price,
-      targetPrice: pick.target_price,
-      stopLoss: pick.stop_loss,
-      timeframe: pick.timeframe || '1-3 months',
-      thesis: pick.thesis || '',
-      reasoning: pick.reasoning || '',
-      keyBullishFactors: pick.key_bullish_factors || [],
-      keyBearishFactors: pick.key_bearish_factors || [],
-      risks: pick.risks || [],
-      catalysts: pick.catalysts || [],
-      status: pick.status || 'active',
-      actualExitPrice: pick.actual_exit_price,
-      actualReturn: pick.actual_return,
-      closedAt: pick.closed_at,
-      createdAt: pick.created_at,
-      updatedAt: pick.updated_at,
-      current_price: pick.current_price,
-      price_change_percent: pick.price_change_percent
-    }));
+    return (data || []).map(normalizePick);
   } catch (e) {
     console.error('Error in getPicks:', e);
     return [];
   }
 }
 
-/**
- * Get ALL stock picks (alias for getPicks with no filters)
- */
 export async function getAllStockPicks(): Promise<StockPick[]> {
   return getPicks();
 }
 
-/**
- * Get AI statistics for battle/leaderboard
- */
 export async function getAIStatistics(): Promise<AIStatistics[]> {
   const models = await getAIModels();
   const picks = await getPicks({ status: 'closed' });
   
   return models.map(model => {
-    const modelPicks = picks.filter(p => p.aiModelId === model.id);
-    const winningPicks = modelPicks.filter(p => (p.actualReturn || 0) > 0);
-    const losingPicks = modelPicks.filter(p => (p.actualReturn || 0) < 0);
+    const modelPicks = picks.filter(p => (p.aiModelId || p.ai_model_id) === model.id);
+    const winningPicks = modelPicks.filter(p => ((p.actualReturn || p.actual_return) || 0) > 0);
+    const losingPicks = modelPicks.filter(p => ((p.actualReturn || p.actual_return) || 0) < 0);
     
-    const totalReturn = modelPicks.reduce((sum, p) => sum + (p.actualReturn || 0), 0);
+    const totalReturn = modelPicks.reduce((sum, p) => sum + ((p.actualReturn || p.actual_return) || 0), 0);
     const avgReturn = modelPicks.length > 0 ? totalReturn / modelPicks.length : 0;
     const avgConfidence = modelPicks.length > 0 
       ? modelPicks.reduce((sum, p) => sum + p.confidence, 0) / modelPicks.length 
@@ -317,11 +347,11 @@ export async function getAIStatistics(): Promise<AIStatistics[]> {
     let streak = 0;
     let streakType: 'winning' | 'losing' | 'none' = 'none';
     const sortedPicks = [...modelPicks].sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()
     );
     
     for (const pick of sortedPicks) {
-      const isWin = (pick.actualReturn || 0) > 0;
+      const isWin = ((pick.actualReturn || pick.actual_return) || 0) > 0;
       if (streak === 0) {
         streakType = isWin ? 'winning' : 'losing';
         streak = 1;
@@ -334,7 +364,7 @@ export async function getAIStatistics(): Promise<AIStatistics[]> {
     
     return {
       aiModelId: model.id,
-      displayName: model.displayName,
+      displayName: model.displayName || model.display_name || model.name,
       color: model.color,
       totalPicks: modelPicks.length,
       winningPicks: winningPicks.length,
@@ -343,29 +373,25 @@ export async function getAIStatistics(): Promise<AIStatistics[]> {
       avgConfidence: Math.round(avgConfidence),
       avgReturn: avgReturn,
       totalProfitLossPercent: totalReturn,
-      bestPick: [...modelPicks].sort((a, b) => (b.actualReturn || 0) - (a.actualReturn || 0))[0],
-      worstPick: [...modelPicks].sort((a, b) => (a.actualReturn || 0) - (b.actualReturn || 0))[0],
+      bestPick: [...modelPicks].sort((a, b) => ((b.actualReturn || b.actual_return) || 0) - ((a.actualReturn || a.actual_return) || 0))[0],
+      worstPick: [...modelPicks].sort((a, b) => ((a.actualReturn || a.actual_return) || 0) - ((b.actualReturn || b.actual_return) || 0))[0],
       recentStreak: streak,
       streakType
     };
   }).sort((a, b) => b.totalProfitLossPercent - a.totalProfitLossPercent);
 }
 
-/**
- * Get overall platform statistics
- */
 export async function getOverallStats(): Promise<OverallStats> {
   const allPicks = await getPicks();
   const closedPicks = allPicks.filter(p => p.status === 'closed');
   const activePicks = allPicks.filter(p => p.status === 'active');
   
-  const winningPicks = closedPicks.filter(p => (p.actualReturn || 0) > 0);
-  const totalReturn = closedPicks.reduce((sum, p) => sum + (p.actualReturn || 0), 0);
+  const winningPicks = closedPicks.filter(p => ((p.actualReturn || p.actual_return) || 0) > 0);
+  const totalReturn = closedPicks.reduce((sum, p) => sum + ((p.actualReturn || p.actual_return) || 0), 0);
   const avgConfidence = allPicks.length > 0 
     ? allPicks.reduce((sum, p) => sum + p.confidence, 0) / allPicks.length 
     : 0;
   
-  // Find best/worst AI
   const stats = await getAIStatistics();
   const best = stats[0];
   const worst = stats[stats.length - 1];
@@ -382,20 +408,14 @@ export async function getOverallStats(): Promise<OverallStats> {
   };
 }
 
-/**
- * Get recent winning picks
- */
 export async function getRecentWinners(limit: number = 5): Promise<StockPick[]> {
   const closedPicks = await getPicks({ status: 'closed' });
   return closedPicks
-    .filter(p => (p.actualReturn || 0) > 0)
-    .sort((a, b) => new Date(b.closedAt || b.createdAt).getTime() - new Date(a.closedAt || a.createdAt).getTime())
+    .filter(p => ((p.actualReturn || p.actual_return) || 0) > 0)
+    .sort((a, b) => new Date(b.closedAt || b.closed_at || b.createdAt || '').getTime() - new Date(a.closedAt || a.closed_at || a.createdAt || '').getTime())
     .slice(0, limit);
 }
 
-/**
- * Search stocks by symbol OR company name
- */
 export async function searchStocks(query: string): Promise<StockInfo[]> {
   if (!query || query.length < 1) return [];
   
@@ -416,7 +436,6 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
     console.log('Using fallback stock search');
   }
   
-  // Fallback common stocks
   const COMMON_STOCKS: StockInfo[] = [
     { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ', sector: 'Technology' },
@@ -429,14 +448,6 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
     { symbol: 'V', name: 'Visa Inc.', exchange: 'NYSE', sector: 'Financial' },
     { symbol: 'JNJ', name: 'Johnson & Johnson', exchange: 'NYSE', sector: 'Healthcare' },
     { symbol: 'WMT', name: 'Walmart Inc.', exchange: 'NYSE', sector: 'Consumer Defensive' },
-    { symbol: 'PG', name: 'Procter & Gamble Co.', exchange: 'NYSE', sector: 'Consumer Defensive' },
-    { symbol: 'MA', name: 'Mastercard Inc.', exchange: 'NYSE', sector: 'Financial' },
-    { symbol: 'HD', name: 'Home Depot Inc.', exchange: 'NYSE', sector: 'Consumer Cyclical' },
-    { symbol: 'CVX', name: 'Chevron Corporation', exchange: 'NYSE', sector: 'Energy' },
-    { symbol: 'XOM', name: 'Exxon Mobil Corporation', exchange: 'NYSE', sector: 'Energy' },
-    { symbol: 'LLY', name: 'Eli Lilly and Company', exchange: 'NYSE', sector: 'Healthcare' },
-    { symbol: 'PFE', name: 'Pfizer Inc.', exchange: 'NYSE', sector: 'Healthcare' },
-    { symbol: 'KO', name: 'Coca-Cola Company', exchange: 'NYSE', sector: 'Consumer Defensive' },
     { symbol: 'DIS', name: 'Walt Disney Company', exchange: 'NYSE', sector: 'Communication Services' },
     { symbol: 'NFLX', name: 'Netflix Inc.', exchange: 'NASDAQ', sector: 'Communication Services' },
     { symbol: 'AMD', name: 'Advanced Micro Devices', exchange: 'NASDAQ', sector: 'Technology' },
@@ -444,8 +455,6 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
     { symbol: 'ADBE', name: 'Adobe Inc.', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'BA', name: 'Boeing Company', exchange: 'NYSE', sector: 'Industrials' },
     { symbol: 'NKE', name: 'Nike Inc.', exchange: 'NYSE', sector: 'Consumer Cyclical' },
-    { symbol: 'MCD', name: "McDonald's Corporation", exchange: 'NYSE', sector: 'Consumer Cyclical' },
-    { symbol: 'SBUX', name: 'Starbucks Corporation', exchange: 'NASDAQ', sector: 'Consumer Cyclical' },
   ];
   
   return COMMON_STOCKS.filter(stock => 
@@ -454,35 +463,29 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
   );
 }
 
-/**
- * Get hot picks (trending/recent high-confidence picks)
- */
 export async function getHotPicks(limit: number = 10): Promise<StockPick[]> {
   return getPicks({ status: 'active', limit });
 }
 
-/**
- * Save a new stock pick
- */
-export async function savePick(pick: Omit<StockPick, 'id' | 'createdAt' | 'updatedAt'>): Promise<StockPick | null> {
+export async function savePick(pick: Omit<StockPick, 'id' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'>): Promise<StockPick | null> {
   try {
     const { data, error } = await supabase
       .from('stock_picks')
       .insert({
-        ai_model_id: pick.aiModelId,
+        ai_model_id: pick.aiModelId || pick.ai_model_id,
         symbol: pick.symbol.toUpperCase(),
-        company_name: pick.companyName,
+        company_name: pick.companyName || pick.company_name,
         sector: pick.sector,
         direction: pick.direction,
         confidence: pick.confidence,
-        entry_price: pick.entryPrice,
-        target_price: pick.targetPrice,
-        stop_loss: pick.stopLoss,
+        entry_price: pick.entryPrice || pick.entry_price,
+        target_price: pick.targetPrice || pick.target_price,
+        stop_loss: pick.stopLoss || pick.stop_loss,
         timeframe: pick.timeframe,
         thesis: pick.thesis,
         reasoning: pick.reasoning,
-        key_bullish_factors: pick.keyBullishFactors,
-        key_bearish_factors: pick.keyBearishFactors,
+        key_bullish_factors: pick.keyBullishFactors || pick.key_bullish_factors,
+        key_bearish_factors: pick.keyBearishFactors || pick.key_bearish_factors,
         risks: pick.risks,
         catalysts: pick.catalysts,
         status: 'active'
@@ -495,28 +498,7 @@ export async function savePick(pick: Omit<StockPick, 'id' | 'createdAt' | 'updat
       return null;
     }
     
-    return data ? {
-      id: data.id,
-      aiModelId: data.ai_model_id,
-      symbol: data.symbol,
-      companyName: data.company_name,
-      sector: data.sector,
-      direction: data.direction,
-      confidence: data.confidence,
-      entryPrice: data.entry_price,
-      targetPrice: data.target_price,
-      stopLoss: data.stop_loss,
-      timeframe: data.timeframe,
-      thesis: data.thesis,
-      reasoning: data.reasoning,
-      keyBullishFactors: data.key_bullish_factors || [],
-      keyBearishFactors: data.key_bearish_factors || [],
-      risks: data.risks || [],
-      catalysts: data.catalysts || [],
-      status: data.status,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    } : null;
+    return data ? normalizePick(data) : null;
   } catch (e) {
     console.error('Error in savePick:', e);
     return null;
