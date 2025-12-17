@@ -1,7 +1,7 @@
 // ============================================================================
 // MARKET ORACLE - COMPLETE SUPABASE CLIENT
-// Merged: Centralized Auth + App-Specific Stock Functions
-// Fixed: 2025-12-17
+// ALL exports restored + centralized auth
+// Fixed: 2025-12-17 11:44 EST
 // ============================================================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -45,7 +45,7 @@ export function createSupabaseServerClient(): SupabaseClient {
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
 
 // ============================================================================
-// APP-SPECIFIC TYPES
+// TYPES
 // ============================================================================
 
 export interface AIModel {
@@ -84,6 +84,9 @@ export interface StockPick {
   closedAt?: string;
   createdAt: string;
   updatedAt: string;
+  // Additional fields for price tracking
+  current_price?: number;
+  price_change_percent?: number;
 }
 
 export interface AIStatistics {
@@ -111,8 +114,19 @@ export interface StockInfo {
   industry?: string;
 }
 
+export interface OverallStats {
+  totalPicks: number;
+  activePicks: number;
+  closedPicks: number;
+  overallWinRate: number;
+  totalReturn: number;
+  avgConfidence: number;
+  bestAI: string;
+  worstAI: string;
+}
+
 // ============================================================================
-// AI MODEL CONFIGURATION (In-memory for now, can be moved to DB later)
+// AI MODEL CONFIGURATION
 // ============================================================================
 
 export const AI_MODELS: AIModel[] = [
@@ -159,14 +173,13 @@ export const AI_MODELS: AIModel[] = [
 ];
 
 // ============================================================================
-// APP-SPECIFIC FUNCTIONS
+// CORE DATA FUNCTIONS
 // ============================================================================
 
 /**
  * Get all AI models
  */
 export async function getAIModels(): Promise<AIModel[]> {
-  // Try to fetch from database first
   try {
     const { data, error } = await supabase
       .from('ai_models')
@@ -189,8 +202,6 @@ export async function getAIModels(): Promise<AIModel[]> {
   } catch (e) {
     console.log('Using in-memory AI models');
   }
-  
-  // Return in-memory models as fallback
   return AI_MODELS;
 }
 
@@ -268,12 +279,21 @@ export async function getPicks(filters?: {
       actualReturn: pick.actual_return,
       closedAt: pick.closed_at,
       createdAt: pick.created_at,
-      updatedAt: pick.updated_at
+      updatedAt: pick.updated_at,
+      current_price: pick.current_price,
+      price_change_percent: pick.price_change_percent
     }));
   } catch (e) {
     console.error('Error in getPicks:', e);
     return [];
   }
+}
+
+/**
+ * Get ALL stock picks (alias for getPicks with no filters)
+ */
+export async function getAllStockPicks(): Promise<StockPick[]> {
+  return getPicks();
 }
 
 /**
@@ -294,7 +314,6 @@ export async function getAIStatistics(): Promise<AIStatistics[]> {
       ? modelPicks.reduce((sum, p) => sum + p.confidence, 0) / modelPicks.length 
       : 0;
     
-    // Calculate streak
     let streak = 0;
     let streakType: 'winning' | 'losing' | 'none' = 'none';
     const sortedPicks = [...modelPicks].sort((a, b) => 
@@ -333,6 +352,48 @@ export async function getAIStatistics(): Promise<AIStatistics[]> {
 }
 
 /**
+ * Get overall platform statistics
+ */
+export async function getOverallStats(): Promise<OverallStats> {
+  const allPicks = await getPicks();
+  const closedPicks = allPicks.filter(p => p.status === 'closed');
+  const activePicks = allPicks.filter(p => p.status === 'active');
+  
+  const winningPicks = closedPicks.filter(p => (p.actualReturn || 0) > 0);
+  const totalReturn = closedPicks.reduce((sum, p) => sum + (p.actualReturn || 0), 0);
+  const avgConfidence = allPicks.length > 0 
+    ? allPicks.reduce((sum, p) => sum + p.confidence, 0) / allPicks.length 
+    : 0;
+  
+  // Find best/worst AI
+  const stats = await getAIStatistics();
+  const best = stats[0];
+  const worst = stats[stats.length - 1];
+  
+  return {
+    totalPicks: allPicks.length,
+    activePicks: activePicks.length,
+    closedPicks: closedPicks.length,
+    overallWinRate: closedPicks.length > 0 ? (winningPicks.length / closedPicks.length) * 100 : 0,
+    totalReturn: totalReturn,
+    avgConfidence: Math.round(avgConfidence),
+    bestAI: best?.displayName || 'N/A',
+    worstAI: worst?.displayName || 'N/A'
+  };
+}
+
+/**
+ * Get recent winning picks
+ */
+export async function getRecentWinners(limit: number = 5): Promise<StockPick[]> {
+  const closedPicks = await getPicks({ status: 'closed' });
+  return closedPicks
+    .filter(p => (p.actualReturn || 0) > 0)
+    .sort((a, b) => new Date(b.closedAt || b.createdAt).getTime() - new Date(a.closedAt || a.createdAt).getTime())
+    .slice(0, limit);
+}
+
+/**
  * Search stocks by symbol OR company name
  */
 export async function searchStocks(query: string): Promise<StockInfo[]> {
@@ -341,7 +402,6 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
   const upperQuery = query.toUpperCase();
   const lowerQuery = query.toLowerCase();
   
-  // Try database first
   try {
     const { data, error } = await supabase
       .from('stocks')
@@ -356,7 +416,7 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
     console.log('Using fallback stock search');
   }
   
-  // Fallback to common stocks (in production, use a proper API)
+  // Fallback common stocks
   const COMMON_STOCKS: StockInfo[] = [
     { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ', sector: 'Technology' },
@@ -365,7 +425,6 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
     { symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'META', name: 'Meta Platforms Inc.', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'TSLA', name: 'Tesla Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical' },
-    { symbol: 'BRK.B', name: 'Berkshire Hathaway Inc.', exchange: 'NYSE', sector: 'Financial' },
     { symbol: 'JPM', name: 'JPMorgan Chase & Co.', exchange: 'NYSE', sector: 'Financial' },
     { symbol: 'V', name: 'Visa Inc.', exchange: 'NYSE', sector: 'Financial' },
     { symbol: 'JNJ', name: 'Johnson & Johnson', exchange: 'NYSE', sector: 'Healthcare' },
@@ -376,20 +435,12 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
     { symbol: 'CVX', name: 'Chevron Corporation', exchange: 'NYSE', sector: 'Energy' },
     { symbol: 'XOM', name: 'Exxon Mobil Corporation', exchange: 'NYSE', sector: 'Energy' },
     { symbol: 'LLY', name: 'Eli Lilly and Company', exchange: 'NYSE', sector: 'Healthcare' },
-    { symbol: 'ABBV', name: 'AbbVie Inc.', exchange: 'NYSE', sector: 'Healthcare' },
     { symbol: 'PFE', name: 'Pfizer Inc.', exchange: 'NYSE', sector: 'Healthcare' },
     { symbol: 'KO', name: 'Coca-Cola Company', exchange: 'NYSE', sector: 'Consumer Defensive' },
-    { symbol: 'PEP', name: 'PepsiCo Inc.', exchange: 'NASDAQ', sector: 'Consumer Defensive' },
-    { symbol: 'MRK', name: 'Merck & Co. Inc.', exchange: 'NYSE', sector: 'Healthcare' },
-    { symbol: 'AVGO', name: 'Broadcom Inc.', exchange: 'NASDAQ', sector: 'Technology' },
-    { symbol: 'COST', name: 'Costco Wholesale Corporation', exchange: 'NASDAQ', sector: 'Consumer Defensive' },
-    { symbol: 'TMO', name: 'Thermo Fisher Scientific', exchange: 'NYSE', sector: 'Healthcare' },
     { symbol: 'DIS', name: 'Walt Disney Company', exchange: 'NYSE', sector: 'Communication Services' },
     { symbol: 'NFLX', name: 'Netflix Inc.', exchange: 'NASDAQ', sector: 'Communication Services' },
     { symbol: 'AMD', name: 'Advanced Micro Devices', exchange: 'NASDAQ', sector: 'Technology' },
-    { symbol: 'INTC', name: 'Intel Corporation', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'CRM', name: 'Salesforce Inc.', exchange: 'NYSE', sector: 'Technology' },
-    { symbol: 'ORCL', name: 'Oracle Corporation', exchange: 'NYSE', sector: 'Technology' },
     { symbol: 'ADBE', name: 'Adobe Inc.', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'BA', name: 'Boeing Company', exchange: 'NYSE', sector: 'Industrials' },
     { symbol: 'NKE', name: 'Nike Inc.', exchange: 'NYSE', sector: 'Consumer Cyclical' },
@@ -407,10 +458,7 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
  * Get hot picks (trending/recent high-confidence picks)
  */
 export async function getHotPicks(limit: number = 10): Promise<StockPick[]> {
-  return getPicks({ 
-    status: 'active', 
-    limit 
-  });
+  return getPicks({ status: 'active', limit });
 }
 
 /**
