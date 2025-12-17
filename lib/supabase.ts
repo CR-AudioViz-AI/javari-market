@@ -1,8 +1,7 @@
 // ============================================================================
 // MARKET ORACLE - COMPLETE SUPABASE CLIENT
-// Multi-Asset: Penny Stocks, Stocks, Crypto
 // ALL exports + ALL aliases for backwards compatibility
-// Fixed: 2025-12-17 12:01 EST
+// Fixed: 2025-12-17 11:52 EST
 // ============================================================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -46,42 +45,6 @@ export function createSupabaseServerClient(): SupabaseClient {
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
 
 // ============================================================================
-// ASSET TYPES
-// ============================================================================
-
-export type AssetType = 'stock' | 'penny_stock' | 'crypto';
-
-export const ASSET_TYPES = {
-  STOCK: 'stock' as AssetType,
-  PENNY_STOCK: 'penny_stock' as AssetType,
-  CRYPTO: 'crypto' as AssetType
-};
-
-export const ASSET_TYPE_CONFIG = {
-  stock: {
-    label: 'Stocks',
-    description: 'Blue chip and mid-cap stocks',
-    icon: 'TrendingUp',
-    color: '#10B981',
-    minPrice: 5
-  },
-  penny_stock: {
-    label: 'Penny Stocks',
-    description: 'High-risk, high-reward under $5',
-    icon: 'Zap',
-    color: '#F59E0B',
-    maxPrice: 5
-  },
-  crypto: {
-    label: 'Crypto',
-    description: 'Cryptocurrencies and tokens',
-    icon: 'Bitcoin',
-    color: '#8B5CF6',
-    minPrice: 0
-  }
-};
-
-// ============================================================================
 // TYPES - With ALL aliases for backwards compatibility
 // ============================================================================
 
@@ -89,20 +52,17 @@ export interface AIModel {
   id: string;
   name: string;
   displayName: string;
-  display_name: string;
+  display_name?: string;
   provider: string;
   color: string;
   description: string;
   strengths: string[];
   isActive: boolean;
-  is_active: boolean;
+  is_active?: boolean;
 }
 
 export interface StockPick {
   id: string;
-  // Asset Type
-  assetType: AssetType;
-  asset_type: AssetType;
   // AI Model references
   aiModelId: string;
   ai_model_id: string;
@@ -110,7 +70,7 @@ export interface StockPick {
   ai_model?: AIModel;
   // Symbol/Ticker - BOTH names supported
   symbol: string;
-  ticker: string;
+  ticker: string; // alias for symbol
   // Company info
   companyName: string;
   company_name: string;
@@ -130,9 +90,9 @@ export interface StockPick {
   thesis: string;
   reasoning: string;
   keyBullishFactors: string[];
-  key_bullish_factors: string[];
+  key_bullish_factors?: string[];
   keyBearishFactors: string[];
-  key_bearish_factors: string[];
+  key_bearish_factors?: string[];
   risks: string[];
   catalysts: string[];
   // Status
@@ -153,8 +113,8 @@ export interface StockPick {
   price_change_percent?: number;
   priceChangePercent?: number;
   // AI display name shortcut
-  ai_display_name: string;
-  ai_color: string;
+  ai_display_name?: string;
+  ai_color?: string;
 }
 
 export interface AIStatistics {
@@ -172,17 +132,6 @@ export interface AIStatistics {
   worstPick?: StockPick;
   recentStreak: number;
   streakType: 'winning' | 'losing' | 'none';
-  // Per asset type stats
-  stockStats?: AssetTypeStats;
-  pennyStockStats?: AssetTypeStats;
-  cryptoStats?: AssetTypeStats;
-}
-
-export interface AssetTypeStats {
-  totalPicks: number;
-  winningPicks: number;
-  winRate: number;
-  avgReturn: number;
 }
 
 export interface StockInfo {
@@ -191,14 +140,6 @@ export interface StockInfo {
   exchange: string;
   sector?: string;
   industry?: string;
-  assetType?: AssetType;
-}
-
-export interface CryptoInfo {
-  symbol: string;
-  name: string;
-  exchange: string;
-  marketCap?: number;
 }
 
 export interface OverallStats {
@@ -210,23 +151,6 @@ export interface OverallStats {
   avgConfidence: number;
   bestAI: string;
   worstAI: string;
-  // Per asset type
-  stockPicks: number;
-  pennyStockPicks: number;
-  cryptoPicks: number;
-}
-
-export interface CompetitionLeaderboard {
-  aiModelId: string;
-  displayName: string;
-  color: string;
-  totalPoints: number;
-  stockPoints: number;
-  pennyStockPoints: number;
-  cryptoPoints: number;
-  rank: number;
-  previousRank?: number;
-  streak: number;
 }
 
 // ============================================================================
@@ -292,16 +216,12 @@ function normalizePick(pick: any): StockPick {
   const aiModel = pick.ai_models || pick.aiModel || pick.ai_model;
   const aiDisplayName = aiModel?.display_name || aiModel?.displayName || aiModel?.name || '';
   const symbolValue = pick.symbol || pick.ticker || '';
-  const assetTypeValue = pick.asset_type || pick.assetType || 'stock';
   
   return {
     id: pick.id,
-    // Asset Type
-    assetType: assetTypeValue,
-    asset_type: assetTypeValue,
     // AI Model
-    aiModelId: pick.ai_model_id || pick.aiModelId || '',
-    ai_model_id: pick.ai_model_id || pick.aiModelId || '',
+    aiModelId: pick.ai_model_id || pick.aiModelId,
+    ai_model_id: pick.ai_model_id || pick.aiModelId,
     aiModel: aiModel,
     ai_model: aiModel,
     // Symbol/Ticker
@@ -312,8 +232,8 @@ function normalizePick(pick: any): StockPick {
     company_name: pick.company_name || pick.companyName || symbolValue,
     sector: pick.sector || 'Unknown',
     // Direction & Confidence
-    direction: pick.direction || 'UP',
-    confidence: pick.confidence || 0,
+    direction: pick.direction,
+    confidence: pick.confidence,
     // Prices
     entryPrice: pick.entry_price || pick.entryPrice || 0,
     entry_price: pick.entry_price || pick.entryPrice || 0,
@@ -349,8 +269,8 @@ function normalizePick(pick: any): StockPick {
     price_change_percent: pick.price_change_percent || pick.priceChangePercent,
     priceChangePercent: pick.price_change_percent || pick.priceChangePercent,
     // AI display name shortcut
-    ai_display_name: aiDisplayName,
-    ai_color: aiModel?.color || "#6366f1"
+    ai_display_name: aiDisplayName
+    ai_color: aiModel?.color || '#6366f1',
   };
 }
 
@@ -391,7 +311,6 @@ export async function getPicks(filters?: {
   symbol?: string;
   status?: string;
   direction?: string;
-  assetType?: AssetType;
   limit?: number;
 }): Promise<StockPick[]> {
   try {
@@ -410,9 +329,6 @@ export async function getPicks(filters?: {
     }
     if (filters?.direction) {
       query = query.eq('direction', filters.direction);
-    }
-    if (filters?.assetType) {
-      query = query.eq('asset_type', filters.assetType);
     }
     
     query = query.order('created_at', { ascending: false });
@@ -435,28 +351,13 @@ export async function getPicks(filters?: {
   }
 }
 
-// Asset-specific getters
-export async function getStockPicks(filters?: { aiModelId?: string; status?: string; limit?: number }): Promise<StockPick[]> {
-  return getPicks({ ...filters, assetType: 'stock' });
-}
-
-export async function getPennyStockPicks(filters?: { aiModelId?: string; status?: string; limit?: number }): Promise<StockPick[]> {
-  return getPicks({ ...filters, assetType: 'penny_stock' });
-}
-
-export async function getCryptoPicks(filters?: { aiModelId?: string; status?: string; limit?: number }): Promise<StockPick[]> {
-  return getPicks({ ...filters, assetType: 'crypto' });
-}
-
 export async function getAllStockPicks(): Promise<StockPick[]> {
   return getPicks();
 }
 
-export async function getAIStatistics(assetType?: AssetType): Promise<AIStatistics[]> {
+export async function getAIStatistics(): Promise<AIStatistics[]> {
   const models = await getAIModels();
-  const picks = assetType 
-    ? await getPicks({ status: 'closed', assetType })
-    : await getPicks({ status: 'closed' });
+  const picks = await getPicks({ status: 'closed' });
   
   return models.map(model => {
     const modelPicks = picks.filter(p => (p.aiModelId || p.ai_model_id) === model.id);
@@ -529,82 +430,17 @@ export async function getOverallStats(): Promise<OverallStats> {
     totalReturn: totalReturn,
     avgConfidence: Math.round(avgConfidence),
     bestAI: best?.displayName || 'N/A',
-    worstAI: worst?.displayName || 'N/A',
-    stockPicks: allPicks.filter(p => p.assetType === 'stock' || p.asset_type === 'stock').length,
-    pennyStockPicks: allPicks.filter(p => p.assetType === 'penny_stock' || p.asset_type === 'penny_stock').length,
-    cryptoPicks: allPicks.filter(p => p.assetType === 'crypto' || p.asset_type === 'crypto').length
+    worstAI: worst?.displayName || 'N/A'
   };
 }
 
-export async function getRecentWinners(limit: number = 5, assetType?: AssetType): Promise<StockPick[]> {
-  const closedPicks = assetType 
-    ? await getPicks({ status: 'closed', assetType })
-    : await getPicks({ status: 'closed' });
+export async function getRecentWinners(limit: number = 5): Promise<StockPick[]> {
+  const closedPicks = await getPicks({ status: 'closed' });
   return closedPicks
     .filter(p => ((p.actualReturn || p.actual_return) || 0) > 0)
     .sort((a, b) => new Date(b.closedAt || b.closed_at || b.createdAt || '').getTime() - new Date(a.closedAt || a.closed_at || a.createdAt || '').getTime())
     .slice(0, limit);
 }
-
-// ============================================================================
-// COMPETITION & LEADERBOARD
-// ============================================================================
-
-export async function getCompetitionLeaderboard(): Promise<CompetitionLeaderboard[]> {
-  const models = await getAIModels();
-  const [stockStats, pennyStats, cryptoStats] = await Promise.all([
-    getAIStatistics('stock'),
-    getAIStatistics('penny_stock'),
-    getAIStatistics('crypto')
-  ]);
-  
-  const leaderboard = models.map(model => {
-    const stock = stockStats.find(s => s.aiModelId === model.id);
-    const penny = pennyStats.find(s => s.aiModelId === model.id);
-    const crypto = cryptoStats.find(s => s.aiModelId === model.id);
-    
-    // Points: Win Rate * 0.4 + Avg Return * 0.4 + Streak Bonus * 0.2
-    const calcPoints = (stats?: AIStatistics) => {
-      if (!stats || stats.totalPicks === 0) return 0;
-      const winPoints = stats.winRate * 0.4;
-      const returnPoints = Math.max(0, stats.avgReturn * 10) * 0.4;
-      const streakBonus = stats.streakType === 'winning' ? stats.recentStreak * 5 : 0;
-      return winPoints + returnPoints + streakBonus;
-    };
-    
-    const stockPoints = calcPoints(stock);
-    const pennyStockPoints = calcPoints(penny);
-    const cryptoPoints = calcPoints(crypto);
-    
-    return {
-      aiModelId: model.id,
-      displayName: model.displayName || model.display_name,
-      color: model.color,
-      totalPoints: stockPoints + pennyStockPoints + cryptoPoints,
-      stockPoints,
-      pennyStockPoints,
-      cryptoPoints,
-      rank: 0,
-      streak: Math.max(
-        stock?.streakType === 'winning' ? stock.recentStreak : 0,
-        penny?.streakType === 'winning' ? penny.recentStreak : 0,
-        crypto?.streakType === 'winning' ? crypto.recentStreak : 0
-      )
-    };
-  });
-  
-  // Sort by total points and assign ranks
-  leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-  leaderboard.forEach((item, index) => {
-    item.rank = index + 1;
-  });
-  
-  return leaderboard;
-}
-
-// ============================================================================
-// SEARCH FUNCTIONS
-// ============================================================================
 
 export async function searchStocks(query: string): Promise<StockInfo[]> {
   if (!query || query.length < 1) return [];
@@ -627,13 +463,17 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
   }
   
   const COMMON_STOCKS: StockInfo[] = [
-    { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' },
-    { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' },
-    { symbol: 'GOOGL', name: 'Alphabet Inc.', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' },
-    { symbol: 'AMZN', name: 'Amazon.com Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical', assetType: 'stock' },
-    { symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' },
-    { symbol: 'META', name: 'Meta Platforms Inc.', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' },
-    { symbol: 'TSLA', name: 'Tesla Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical', assetType: 'stock' },
+    { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology' },
+    { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ', sector: 'Technology' },
+    { symbol: 'GOOGL', name: 'Alphabet Inc.', exchange: 'NASDAQ', sector: 'Technology' },
+    { symbol: 'AMZN', name: 'Amazon.com Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical' },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ', sector: 'Technology' },
+    { symbol: 'META', name: 'Meta Platforms Inc.', exchange: 'NASDAQ', sector: 'Technology' },
+    { symbol: 'TSLA', name: 'Tesla Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical' },
+    { symbol: 'JPM', name: 'JPMorgan Chase & Co.', exchange: 'NYSE', sector: 'Financial' },
+    { symbol: 'DIS', name: 'Walt Disney Company', exchange: 'NYSE', sector: 'Communication Services' },
+    { symbol: 'NFLX', name: 'Netflix Inc.', exchange: 'NASDAQ', sector: 'Communication Services' },
+    { symbol: 'AMD', name: 'Advanced Micro Devices', exchange: 'NASDAQ', sector: 'Technology' },
   ];
   
   return COMMON_STOCKS.filter(stock => 
@@ -642,74 +482,9 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
   );
 }
 
-export async function searchCrypto(query: string): Promise<CryptoInfo[]> {
-  if (!query || query.length < 1) return [];
-  
-  const upperQuery = query.toUpperCase();
-  const lowerQuery = query.toLowerCase();
-  
-  const COMMON_CRYPTO: CryptoInfo[] = [
-    { symbol: 'BTC', name: 'Bitcoin', exchange: 'Crypto' },
-    { symbol: 'ETH', name: 'Ethereum', exchange: 'Crypto' },
-    { symbol: 'SOL', name: 'Solana', exchange: 'Crypto' },
-    { symbol: 'XRP', name: 'Ripple', exchange: 'Crypto' },
-    { symbol: 'ADA', name: 'Cardano', exchange: 'Crypto' },
-    { symbol: 'DOGE', name: 'Dogecoin', exchange: 'Crypto' },
-    { symbol: 'AVAX', name: 'Avalanche', exchange: 'Crypto' },
-    { symbol: 'DOT', name: 'Polkadot', exchange: 'Crypto' },
-    { symbol: 'MATIC', name: 'Polygon', exchange: 'Crypto' },
-    { symbol: 'LINK', name: 'Chainlink', exchange: 'Crypto' },
-  ];
-  
-  return COMMON_CRYPTO.filter(crypto => 
-    crypto.symbol.includes(upperQuery) || 
-    crypto.name.toLowerCase().includes(lowerQuery)
-  );
+export async function getHotPicks(limit: number = 10): Promise<StockPick[]> {
+  return getPicks({ status: 'active', limit });
 }
-
-export async function searchPennyStocks(query: string): Promise<StockInfo[]> {
-  if (!query || query.length < 1) return [];
-  
-  const upperQuery = query.toUpperCase();
-  const lowerQuery = query.toLowerCase();
-  
-  const PENNY_STOCKS: StockInfo[] = [
-    { symbol: 'SNDL', name: 'Sundial Growers', exchange: 'NASDAQ', sector: 'Healthcare', assetType: 'penny_stock' },
-    { symbol: 'NAKD', name: 'Naked Brand Group', exchange: 'NASDAQ', sector: 'Consumer', assetType: 'penny_stock' },
-    { symbol: 'CTRM', name: 'Castor Maritime', exchange: 'NASDAQ', sector: 'Industrials', assetType: 'penny_stock' },
-    { symbol: 'ZOM', name: 'Zomedica Corp', exchange: 'NYSE', sector: 'Healthcare', assetType: 'penny_stock' },
-    { symbol: 'TNXP', name: 'Tonix Pharmaceuticals', exchange: 'NASDAQ', sector: 'Healthcare', assetType: 'penny_stock' },
-  ];
-  
-  return PENNY_STOCKS.filter(stock => 
-    stock.symbol.includes(upperQuery) || 
-    stock.name.toLowerCase().includes(lowerQuery)
-  );
-}
-
-// ============================================================================
-// HOT PICKS BY ASSET TYPE
-// ============================================================================
-
-export async function getHotPicks(limit: number = 10, assetType?: AssetType): Promise<StockPick[]> {
-  return getPicks({ status: 'active', limit, assetType });
-}
-
-export async function getHotStocks(limit: number = 10): Promise<StockPick[]> {
-  return getHotPicks(limit, 'stock');
-}
-
-export async function getHotPennyStocks(limit: number = 10): Promise<StockPick[]> {
-  return getHotPicks(limit, 'penny_stock');
-}
-
-export async function getHotCrypto(limit: number = 10): Promise<StockPick[]> {
-  return getHotPicks(limit, 'crypto');
-}
-
-// ============================================================================
-// SAVE PICK
-// ============================================================================
 
 export async function savePick(pick: Partial<StockPick>): Promise<StockPick | null> {
   try {
@@ -717,7 +492,6 @@ export async function savePick(pick: Partial<StockPick>): Promise<StockPick | nu
       .from('stock_picks')
       .insert({
         ai_model_id: pick.aiModelId || pick.ai_model_id,
-        asset_type: pick.assetType || pick.asset_type || 'stock',
         symbol: (pick.symbol || pick.ticker || '').toUpperCase(),
         company_name: pick.companyName || pick.company_name,
         sector: pick.sector,
