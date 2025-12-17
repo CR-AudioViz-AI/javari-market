@@ -387,6 +387,7 @@ export async function getAIModels(): Promise<AIModel[]> {
 }
 
 export async function getPicks(filters?: {
+  category?: "regular" | "penny" | "crypto";
   aiModelId?: string;
   symbol?: string;
   status?: string;
@@ -395,6 +396,11 @@ export async function getPicks(filters?: {
   limit?: number;
 }): Promise<StockPick[]> {
   try {
+    // Map category to assetType for backwards compatibility
+    const categoryMap: Record<string, AssetType> = { regular: "stock", penny: "penny_stock", crypto: "crypto" };
+    if (filters?.category && !filters?.assetType) {
+      filters = { ...filters, assetType: categoryMap[filters.category] };
+    }
     let query = supabase
       .from('stock_picks')
       .select('*, ai_models(*)');
@@ -749,3 +755,4 @@ export async function savePick(pick: Partial<StockPick>): Promise<StockPick | nu
     return null;
   }
 }
+
