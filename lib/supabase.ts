@@ -1,7 +1,7 @@
 // ============================================================================
 // MARKET ORACLE - COMPLETE SUPABASE CLIENT
-// ALL exports + snake_case aliases for backwards compatibility
-// Fixed: 2025-12-17 11:48 EST
+// ALL exports + ALL aliases for backwards compatibility
+// Fixed: 2025-12-17 11:52 EST
 // ============================================================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -45,66 +45,75 @@ export function createSupabaseServerClient(): SupabaseClient {
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
 
 // ============================================================================
-// TYPES - With snake_case aliases for backwards compatibility
+// TYPES - With ALL aliases for backwards compatibility
 // ============================================================================
 
 export interface AIModel {
   id: string;
   name: string;
   displayName: string;
-  display_name?: string; // alias
+  display_name?: string;
   provider: string;
   color: string;
   description: string;
   strengths: string[];
   isActive: boolean;
-  is_active?: boolean; // alias
+  is_active?: boolean;
 }
 
 export interface StockPick {
   id: string;
+  // AI Model references
   aiModelId: string;
-  ai_model_id?: string; // alias
+  ai_model_id?: string;
   aiModel?: AIModel;
-  ai_model?: AIModel; // alias
+  ai_model?: AIModel;
+  // Symbol/Ticker - BOTH names supported
   symbol: string;
+  ticker?: string; // alias for symbol
+  // Company info
   companyName: string;
-  company_name?: string; // alias
+  company_name?: string;
   sector: string;
+  // Direction & Confidence
   direction: 'UP' | 'DOWN' | 'HOLD';
   confidence: number;
   // Price fields - both camelCase and snake_case
   entryPrice: number;
-  entry_price?: number; // alias
+  entry_price?: number;
   targetPrice: number;
-  target_price?: number; // alias
+  target_price?: number;
   stopLoss: number;
-  stop_loss?: number; // alias
+  stop_loss?: number;
+  // Additional details
   timeframe: string;
   thesis: string;
   reasoning: string;
   keyBullishFactors: string[];
-  key_bullish_factors?: string[]; // alias
+  key_bullish_factors?: string[];
   keyBearishFactors: string[];
-  key_bearish_factors?: string[]; // alias
+  key_bearish_factors?: string[];
   risks: string[];
   catalysts: string[];
+  // Status
   status: 'active' | 'closed' | 'expired';
   actualExitPrice?: number;
-  actual_exit_price?: number; // alias
+  actual_exit_price?: number;
   actualReturn?: number;
-  actual_return?: number; // alias
+  actual_return?: number;
   closedAt?: string;
-  closed_at?: string; // alias
+  closed_at?: string;
   createdAt: string;
-  created_at?: string; // alias
+  created_at?: string;
   updatedAt: string;
-  updated_at?: string; // alias
-  // Price tracking fields
+  updated_at?: string;
+  // Price tracking
   current_price?: number;
-  currentPrice?: number; // alias
+  currentPrice?: number;
   price_change_percent?: number;
-  priceChangePercent?: number; // alias
+  priceChangePercent?: number;
+  // AI display name shortcut
+  ai_display_name?: string;
 }
 
 export interface AIStatistics {
@@ -199,28 +208,39 @@ export const AI_MODELS: AIModel[] = [
 ];
 
 // ============================================================================
-// HELPER: Normalize pick to have both camelCase and snake_case
+// HELPER: Normalize pick to have ALL aliases
 // ============================================================================
 
 function normalizePick(pick: any): StockPick {
+  const aiModel = pick.ai_models || pick.aiModel || pick.ai_model;
+  const aiDisplayName = aiModel?.display_name || aiModel?.displayName || aiModel?.name || '';
+  const symbolValue = pick.symbol || pick.ticker || '';
+  
   return {
     id: pick.id,
+    // AI Model
     aiModelId: pick.ai_model_id || pick.aiModelId,
     ai_model_id: pick.ai_model_id || pick.aiModelId,
-    aiModel: pick.ai_models || pick.aiModel,
-    ai_model: pick.ai_models || pick.aiModel,
-    symbol: pick.symbol,
-    companyName: pick.company_name || pick.companyName || pick.symbol,
-    company_name: pick.company_name || pick.companyName || pick.symbol,
+    aiModel: aiModel,
+    ai_model: aiModel,
+    // Symbol/Ticker
+    symbol: symbolValue,
+    ticker: symbolValue,
+    // Company
+    companyName: pick.company_name || pick.companyName || symbolValue,
+    company_name: pick.company_name || pick.companyName || symbolValue,
     sector: pick.sector || 'Unknown',
+    // Direction & Confidence
     direction: pick.direction,
     confidence: pick.confidence,
+    // Prices
     entryPrice: pick.entry_price || pick.entryPrice || 0,
     entry_price: pick.entry_price || pick.entryPrice || 0,
     targetPrice: pick.target_price || pick.targetPrice || 0,
     target_price: pick.target_price || pick.targetPrice || 0,
     stopLoss: pick.stop_loss || pick.stopLoss || 0,
     stop_loss: pick.stop_loss || pick.stopLoss || 0,
+    // Details
     timeframe: pick.timeframe || '1-3 months',
     thesis: pick.thesis || '',
     reasoning: pick.reasoning || '',
@@ -230,6 +250,7 @@ function normalizePick(pick: any): StockPick {
     key_bearish_factors: pick.key_bearish_factors || pick.keyBearishFactors || [],
     risks: pick.risks || [],
     catalysts: pick.catalysts || [],
+    // Status
     status: pick.status || 'active',
     actualExitPrice: pick.actual_exit_price || pick.actualExitPrice,
     actual_exit_price: pick.actual_exit_price || pick.actualExitPrice,
@@ -241,10 +262,13 @@ function normalizePick(pick: any): StockPick {
     created_at: pick.created_at || pick.createdAt || new Date().toISOString(),
     updatedAt: pick.updated_at || pick.updatedAt || new Date().toISOString(),
     updated_at: pick.updated_at || pick.updatedAt || new Date().toISOString(),
+    // Price tracking
     current_price: pick.current_price || pick.currentPrice,
     currentPrice: pick.current_price || pick.currentPrice,
     price_change_percent: pick.price_change_percent || pick.priceChangePercent,
-    priceChangePercent: pick.price_change_percent || pick.priceChangePercent
+    priceChangePercent: pick.price_change_percent || pick.priceChangePercent,
+    // AI display name shortcut
+    ai_display_name: aiDisplayName
   };
 }
 
@@ -445,16 +469,9 @@ export async function searchStocks(query: string): Promise<StockInfo[]> {
     { symbol: 'META', name: 'Meta Platforms Inc.', exchange: 'NASDAQ', sector: 'Technology' },
     { symbol: 'TSLA', name: 'Tesla Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical' },
     { symbol: 'JPM', name: 'JPMorgan Chase & Co.', exchange: 'NYSE', sector: 'Financial' },
-    { symbol: 'V', name: 'Visa Inc.', exchange: 'NYSE', sector: 'Financial' },
-    { symbol: 'JNJ', name: 'Johnson & Johnson', exchange: 'NYSE', sector: 'Healthcare' },
-    { symbol: 'WMT', name: 'Walmart Inc.', exchange: 'NYSE', sector: 'Consumer Defensive' },
     { symbol: 'DIS', name: 'Walt Disney Company', exchange: 'NYSE', sector: 'Communication Services' },
     { symbol: 'NFLX', name: 'Netflix Inc.', exchange: 'NASDAQ', sector: 'Communication Services' },
     { symbol: 'AMD', name: 'Advanced Micro Devices', exchange: 'NASDAQ', sector: 'Technology' },
-    { symbol: 'CRM', name: 'Salesforce Inc.', exchange: 'NYSE', sector: 'Technology' },
-    { symbol: 'ADBE', name: 'Adobe Inc.', exchange: 'NASDAQ', sector: 'Technology' },
-    { symbol: 'BA', name: 'Boeing Company', exchange: 'NYSE', sector: 'Industrials' },
-    { symbol: 'NKE', name: 'Nike Inc.', exchange: 'NYSE', sector: 'Consumer Cyclical' },
   ];
   
   return COMMON_STOCKS.filter(stock => 
@@ -467,13 +484,13 @@ export async function getHotPicks(limit: number = 10): Promise<StockPick[]> {
   return getPicks({ status: 'active', limit });
 }
 
-export async function savePick(pick: Omit<StockPick, 'id' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'>): Promise<StockPick | null> {
+export async function savePick(pick: Partial<StockPick>): Promise<StockPick | null> {
   try {
     const { data, error } = await supabase
       .from('stock_picks')
       .insert({
         ai_model_id: pick.aiModelId || pick.ai_model_id,
-        symbol: pick.symbol.toUpperCase(),
+        symbol: (pick.symbol || pick.ticker || '').toUpperCase(),
         company_name: pick.companyName || pick.company_name,
         sector: pick.sector,
         direction: pick.direction,
