@@ -1,8 +1,7 @@
 // ============================================================================
 // MARKET ORACLE - ROOT LAYOUT
-// Wrapped with centralized AuthProvider + Global JavariWidget
-// Created: December 15, 2025
-// Updated: December 16, 2025 - Added global Javari AI assistant
+// With AuthProvider, Global Header, and JavariWidget
+// Fixed: 2025-12-17
 // ============================================================================
 
 import type { Metadata } from 'next';
@@ -10,13 +9,14 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/AuthProvider';
 import JavariWidget from '@/components/JavariWidget';
+import Header from '@/components/Header';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Market Oracle AI | Multi-AI Stock Analysis',
-  description: 'Get stock predictions from 4 leading AI models with Javari consensus. Part of CR AudioViz AI ecosystem.',
-  keywords: 'stock analysis, AI trading, market predictions, GPT-4, Claude, Gemini, Perplexity',
+  description: 'Get stock predictions from 4 leading AI models (GPT-4, Claude, Gemini, Perplexity) with Javari consensus. Part of CR AudioViz AI ecosystem.',
+  keywords: 'stock analysis, AI trading, market predictions, GPT-4, Claude, Gemini, Perplexity, stock picks',
   authors: [{ name: 'CR AudioViz AI' }],
   openGraph: {
     title: 'Market Oracle AI | Multi-AI Stock Analysis',
@@ -58,8 +58,15 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} bg-gray-950 text-white antialiased`}>
         <AuthProvider>
-          {children}
-          {/* Global Javari AI Assistant - Available on all pages */}
+          {/* Global Header - Shows on ALL pages */}
+          <Header />
+          
+          {/* Page Content */}
+          <main className="min-h-screen">
+            {children}
+          </main>
+          
+          {/* Global Javari AI Assistant */}
           <JavariWidget />
         </AuthProvider>
       </body>
