@@ -98,7 +98,7 @@ export default function CryptoPage() {
               </h1>
               <p className="text-gray-400">AI-powered cryptocurrency predictions</p>
             </div>
-            <JavariHelpButton className="ml-auto" />
+            <JavariHelpButton topic="Cryptocurrency Trading" className="ml-auto" />
           </div>
           
           {/* Quick Stats */}
@@ -367,3 +367,4 @@ function CryptoPickCard({ pick }: { pick: StockPick }) {
     </div>
   );
 }
+
