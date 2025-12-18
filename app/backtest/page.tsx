@@ -91,7 +91,7 @@ export default function BacktestPage() {
       
       // Sort by date and limit
       filteredPicks = filteredPicks
-        .sort((a, b) => new Date(a.pick_date || a.created_at).getTime() - new Date(b.pick_date || b.created_at).getTime())
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .slice(0, config.maxPositions * 5); // Get more than needed for realistic sim
       
       if (filteredPicks.length === 0) {
