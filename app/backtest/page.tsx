@@ -83,7 +83,7 @@ export default function BacktestPage() {
       // Filter picks based on config
       let filteredPicks = picks.filter(p => {
         if (config.aiModel && p.ai_model_id !== config.aiModel) return false;
-        if (config.category && p.category !== config.category) return false;
+        if (config.category && p.asset_type !== ({ regular: 'stock', penny: 'penny_stock', crypto: 'crypto' }[config.category] || config.category)) return false;
         if (p.confidence < config.minConfidence) return false;
         if (!p.current_price || !p.entry_price) return false;
         return true;
@@ -501,3 +501,4 @@ export default function BacktestPage() {
     </div>
   );
 }
+
