@@ -33,7 +33,7 @@ export default function ChartsPage() {
       acc[pick.ai_name] = { total: 0, avgConfidence: 0, picks: [] }
     }
     acc[pick.ai_name].total++
-    acc[pick.ai_name].avgConfidence += pick.confidence_score
+    acc[pick.ai_name].avgConfidence += pick.confidence
     acc[pick.ai_name].picks.push(pick)
     return acc
   }, {})
@@ -123,7 +123,7 @@ export default function ChartsPage() {
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold text-green-400 mb-2">
-              {(picks.reduce((sum, p) => sum + p.confidence_score, 0) / picks.length).toFixed(1)}%
+              {(picks.reduce((sum, p) => sum + p.confidence, 0) / picks.length).toFixed(1)}%
             </p>
             <p className="text-slate-400">Avg Confidence</p>
           </div>
@@ -136,3 +136,4 @@ export default function ChartsPage() {
     </div>
   )
 }
+
