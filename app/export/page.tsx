@@ -96,7 +96,7 @@ export default function ExportPage() {
         stop_loss: pick.stop_loss,
         change_percent: pick.price_change_percent?.toFixed(2) || '',
         status: pick.status,
-        pick_date: pick.created_at,
+        created_at: pick.created_at,
       };
       
       if (includeReasoning) {
@@ -400,5 +400,6 @@ export default function ExportPage() {
     </div>
   );
 }
+
 
 
