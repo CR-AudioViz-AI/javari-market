@@ -36,8 +36,8 @@ export function AdvancedAnalytics() {
         
         const aiStats = aiPerformance.get(pick.ai_name)
         aiStats.picks.push(pick)
-        aiStats.avgConfidence += pick.confidence_score
-        if (pick.confidence_score >= 80) aiStats.highConfidencePicks++
+        aiStats.avgConfidence += pick.confidence
+        if (pick.confidence >= 80) aiStats.highConfidencePicks++
         
         const gain = calculateGainPercentage(pick.entry_price, pick.target_price)
         aiStats.avgGain += gain
@@ -49,7 +49,7 @@ export function AdvancedAnalytics() {
         }
         const timeStats = timeAnalysis.get(date)
         timeStats.picks++
-        timeStats.totalConfidence += pick.confidence_score
+        timeStats.totalConfidence += pick.confidence
       })
       
       // Calculate averages
@@ -84,7 +84,7 @@ export function AdvancedAnalytics() {
         avgMarketGain: picks.reduce((sum, p) => 
           sum + calculateGainPercentage(p.entry_price, p.target_price), 0
         ) / picks.length,
-        highConfidenceCount: picks.filter(p => p.confidence_score >= 80).length
+        highConfidenceCount: picks.filter(p => p.confidence >= 80).length
       })
     } catch (error) {
       console.error('Analytics error:', error)
@@ -222,3 +222,4 @@ export function AdvancedAnalytics() {
     </div>
   )
 }
+
