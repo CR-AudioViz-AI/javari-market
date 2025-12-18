@@ -18,9 +18,7 @@ export default function Error({
   }, [error]);
 
   const handleAskJavari = () => {
-    triggerJavariHelp(
-    'I encountered an error. Can you help me troubleshoot?'
-    );
+    triggerJavariHelp('I encountered an error. Can you help me troubleshoot?');
   };
 
   return (
