@@ -49,7 +49,7 @@ export default function InsightsPage() {
     if (sortBy === 'date') {
       filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     } else if (sortBy === 'confidence') {
-      filtered.sort((a, b) => (b.confidence_score || 0) - a.confidence_score)
+      filtered.sort((a, b) => (b.confidence || 0) - a.confidence)
     } else if (sortBy === 'symbol') {
       filtered.sort((a, b) => (a.symbol || "").localeCompare((b.symbol || "")))
     }
@@ -65,7 +65,7 @@ export default function InsightsPage() {
         p.symbol,
         (p.entry_price || 0),
         (p.target_price || 0),
-        (p.confidence_score || 0),
+        (p.confidence || 0),
         formatDate(p.created_at),
         `"${p.reasoning.replace(/"/g, '""')}"`
       ].join(','))
@@ -186,10 +186,10 @@ export default function InsightsPage() {
                         <div className="w-20 bg-slate-700 rounded-full h-2">
                           <div
                             className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full"
-                            style={{ width: `${(pick.confidence_score || 0)}%` }}
+                            style={{ width: `${(pick.confidence || 0)}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm">{(pick.confidence_score || 0)}%</span>
+                        <span className="text-sm">{(pick.confidence || 0)}%</span>
                       </div>
                     </td>
                     <td className="p-4 text-slate-400 text-sm">{formatDate(pick.created_at)}</td>
@@ -206,3 +206,4 @@ export default function InsightsPage() {
     </div>
   )
 }
+
