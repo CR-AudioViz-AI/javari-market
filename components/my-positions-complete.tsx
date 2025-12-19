@@ -300,7 +300,7 @@ export default function MyPositionsComplete() {
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <Badge variant="outline">{position.ai_display_name}</Badge>
+                        <Badge variant="outline">{position.ai_name}</Badge>
                       </td>
                       <td className="text-right py-3 px-4">{position.quantity}</td>
                       <td className="text-right py-3 px-4">
@@ -370,7 +370,7 @@ export default function MyPositionsComplete() {
                     <div key={position.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                       <div>
                         <p className="font-bold">{position.ticker}</p>
-                        <p className="text-sm text-gray-600">{position.ai_display_name}</p>
+                        <p className="text-sm text-gray-600">{position.ai_name}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-green-600">
@@ -400,7 +400,7 @@ export default function MyPositionsComplete() {
                     <div key={position.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                       <div>
                         <p className="font-bold">{position.ticker}</p>
-                        <p className="text-sm text-gray-600">{position.ai_display_name}</p>
+                        <p className="text-sm text-gray-600">{position.ai_name}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-red-600">
@@ -426,4 +426,5 @@ export default function MyPositionsComplete() {
     </div>
   );
 }
+
 
