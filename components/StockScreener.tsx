@@ -54,7 +54,7 @@ export function StockScreener() {
 
     // AI filter
     if (filters.aiModels.length > 0) {
-      result = result.filter(p => filters.aiModels.includes(p.ai_name))
+      result = result.filter(p => filters.aiModels.includes(p.ai_display_name))
     }
 
     setFiltered(result)
@@ -153,14 +153,14 @@ export function StockScreener() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.slice(0, 12).map(pick => {
           const gain = calculateGainPercentage(pick.entry_price, pick.target_price)
-          const colors = getAIColor(pick.ai_name)
+          const colors = getAIColor(pick.ai_display_name)
 
           return (
             <div key={pick.id} className="bg-slate-900/50 rounded-lg p-4 border border-slate-800 hover:border-brand-cyan/50 transition-all">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xl font-bold">{pick.symbol}</h4>
                 <div className="px-2 py-1 rounded text-xs" style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})` }}>
-                  {pick.ai_name}
+                  {pick.ai_display_name}
                 </div>
               </div>
               <div className="space-y-2 text-sm">
@@ -188,4 +188,5 @@ export function StockScreener() {
     </div>
   )
 }
+
 
