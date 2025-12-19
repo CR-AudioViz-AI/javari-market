@@ -140,7 +140,7 @@ export default function DashboardComplete() {
       const avgReturn = performanceArray.length > 0
         ? performanceArray.reduce((sum, ai) => sum + ai.average_return, 0) / performanceArray.length
         : 0;
-      const topPerformer = performanceArray.length > 0 ? performanceArray[0].ai_display_name : '';
+      const topPerformer = performanceArray.length > 0 ? performanceArray[0].ai_name : '';
 
       setMarketStats({
         totalPicks,
@@ -409,4 +409,5 @@ export default function DashboardComplete() {
     </div>
   );
 }
+
 
