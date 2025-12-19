@@ -24,8 +24,8 @@ export function AdvancedAnalytics() {
       
       picks.forEach(pick => {
         // AI Performance
-        if (!aiPerformance.has(pick.ai_name)) {
-          aiPerformance.set(pick.ai_name, {
+        if (!aiPerformance.has(pick.ai_display_name)) {
+          aiPerformance.set(pick.ai_display_name, {
             picks: [],
             avgGain: 0,
             avgConfidence: 0,
@@ -34,7 +34,7 @@ export function AdvancedAnalytics() {
           })
         }
         
-        const aiStats = aiPerformance.get(pick.ai_name)
+        const aiStats = aiPerformance.get(pick.ai_display_name)
         aiStats.picks.push(pick)
         aiStats.avgConfidence += pick.confidence
         if (pick.confidence >= 80) aiStats.highConfidencePicks++
@@ -222,4 +222,5 @@ export function AdvancedAnalytics() {
     </div>
   )
 }
+
 
