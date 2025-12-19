@@ -1,43 +1,39 @@
-// ============================================================================
-// MARKET ORACLE - COMPLETE SUPABASE CLIENT
-// Multi-Asset: Penny Stocks, Stocks, Crypto + Competition
-// ALL exports + ALL aliases for backwards compatibility
-// Fixed: 2025-12-17 12:10 EST
-// ============================================================================
+// lib/supabase.ts
+// CR AudioViz AI - Market Oracle Database & Price Functions
+// TIMESTAMP: 2025-12-19 17:55 EST
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kteobfyferrukqeolofj.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxOTcyNjYsImV4cCI6MjA3NzU1NzI2Nn0.uy-jlF_z6qVb8qogsNyGDLHqT4HhmdRhLrW7zPv3qhY';
+const supabase = createClientComponentClient();
 
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let browserClient: SupabaseClient | null = null;
-export function createSupabaseBrowserClient(): SupabaseClient {
-  if (typeof window === 'undefined') return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  if (!browserClient) {
-    browserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-    });
-  }
-  return browserClient;
-}
-
-export function createSupabaseServerClient(): SupabaseClient {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  return createClient(SUPABASE_URL, serviceKey);
-}
-
-export { SUPABASE_URL, SUPABASE_ANON_KEY };
-
+// Asset Types
 export type AssetType = 'stock' | 'penny_stock' | 'crypto';
-export const ASSET_TYPES = { STOCK: 'stock' as AssetType, PENNY_STOCK: 'penny_stock' as AssetType, CRYPTO: 'crypto' as AssetType };
 
+// Interfaces
 export interface AIModel {
-  id: string; name: string; displayName: string; display_name: string;
-  provider: string; color: string; description: string; strengths: string[];
+  id: string;
+  name: string;
+  displayName: string; display_name: string;
+  provider: string;
+  color: string;
+  description?: string;
+  strengths?: string[];
   isActive: boolean; is_active: boolean;
+}
+
+export interface StockInfo {
+  symbol: string;
+  name: string;
+  exchange: string;
+  sector?: string;
+  industry?: string;
+  assetType?: AssetType;
+}
+
+export interface CryptoInfo {
+  symbol: string;
+  name: string;
+  exchange: string;
 }
 
 export interface StockPick {
@@ -78,32 +74,56 @@ export interface AIStatistics {
   recentStreak: number; streakType: 'winning' | 'losing' | 'none';
 }
 
-export interface StockInfo { symbol: string; name: string; exchange: string; sector?: string; industry?: string; assetType?: AssetType; }
-export interface CryptoInfo { symbol: string; name: string; exchange: string; marketCap?: number; }
-
 export interface OverallStats {
   totalPicks: number; activePicks: number; closedPicks: number;
-  overallWinRate: number; totalReturn: number; avgConfidence: number;
-  bestAI: string; worstAI: string;
-  stockPicks: number; pennyStockPicks: number; cryptoPicks: number;
+  winRate: number; avgConfidence: number;
+  totalProfitLoss: number; topAI: string;
+  bestPick: StockPick | null; worstPick: StockPick | null;
 }
 
-export interface CompetitionLeaderboard {
-  aiModelId: string; displayName: string; color: string;
-  totalPoints: number; stockPoints: number; pennyStockPoints: number; cryptoPoints: number;
-  rank: number; previousRank?: number; streak: number;
+export const AI_MODELS = {
+  GPT4: { id: 'gpt4', name: 'GPT-4', color: '#10b981' },
+  CLAUDE: { id: 'claude', name: 'Claude', color: '#8b5cf6' },
+  GEMINI: { id: 'gemini', name: 'Gemini', color: '#3b82f6' },
+  PERPLEXITY: { id: 'perplexity', name: 'Perplexity', color: '#06b6d4' },
+};
+
+// Price cache to reduce API calls
+const priceCache: Map<string, { price: number; timestamp: number }> = new Map();
+const PRICE_CACHE_TTL = 60000; // 1 minute
+
+// Fetch current price for a symbol
+async function fetchCurrentPrice(symbol: string): Promise<number | null> {
+  const cached = priceCache.get(symbol);
+  if (cached && Date.now() - cached.timestamp < PRICE_CACHE_TTL) {
+    return cached.price;
+  }
+
+  try {
+    // Try Alpha Vantage
+    const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_KEY || process.env.ALPHA_VANTAGE_API_KEY;
+    if (apiKey) {
+      const res = await fetch(
+        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`,
+        { next: { revalidate: 60 } }
+      );
+      const data = await res.json();
+      const price = parseFloat(data['Global Quote']?.['05. price']);
+      if (!isNaN(price) && price > 0) {
+        priceCache.set(symbol, { price, timestamp: Date.now() });
+        return price;
+      }
+    }
+  } catch (e) {
+    console.error(`Price fetch error for ${symbol}:`, e);
+  }
+  return null;
 }
 
-export const AI_MODELS: AIModel[] = [
-  { id: 'gpt4', name: 'gpt4', displayName: 'GPT-4', display_name: 'GPT-4', provider: 'OpenAI', color: '#10B981', description: 'Conservative analysis', strengths: ['Fundamental Analysis'], isActive: true, is_active: true },
-  { id: 'claude', name: 'claude', displayName: 'Claude', display_name: 'Claude', provider: 'Anthropic', color: '#F59E0B', description: 'Balanced analysis', strengths: ['Risk Analysis'], isActive: true, is_active: true },
-  { id: 'gemini', name: 'gemini', displayName: 'Gemini', display_name: 'Gemini', provider: 'Google', color: '#3B82F6', description: 'Technical patterns', strengths: ['Technical Analysis'], isActive: true, is_active: true },
-  { id: 'perplexity', name: 'perplexity', displayName: 'Perplexity', display_name: 'Perplexity', provider: 'Perplexity AI', color: '#8B5CF6', description: 'Real-time data', strengths: ['News Analysis'], isActive: true, is_active: true }
-];
-
+// Normalize pick from database
 function normalizePick(pick: any): StockPick {
   const aiModel = pick.ai_models || pick.aiModel || pick.ai_model;
-  const aiDisplayName = aiModel?.display_name || aiModel?.displayName || aiModel?.name || '';
+  const aiDisplayName = aiModel?.display_name || aiModel?.displayName || aiModel?.name || 'AI';
   const aiColor = aiModel?.color || '#6366f1';
   const symbolValue = pick.symbol || pick.ticker || '';
   const assetTypeValue = pick.asset_type || pick.assetType || 'stock';
@@ -116,7 +136,7 @@ function normalizePick(pick: any): StockPick {
     symbol: symbolValue, ticker: symbolValue,
     companyName: pick.company_name || pick.companyName || symbolValue, company_name: pick.company_name || pick.companyName || symbolValue,
     sector: pick.sector || 'Unknown',
-    direction: pick.direction || 'UP',
+    direction: pick.direction || 'HOLD',
     confidence: pick.confidence || 0,
     entryPrice: pick.entry_price || pick.entryPrice || 0, entry_price: pick.entry_price || pick.entryPrice || 0,
     targetPrice: pick.target_price || pick.targetPrice || 0, target_price: pick.target_price || pick.targetPrice || 0,
@@ -131,8 +151,8 @@ function normalizePick(pick: any): StockPick {
     closedAt: pick.closed_at || pick.closedAt, closed_at: pick.closed_at || pick.closedAt,
     createdAt: pick.created_at || pick.createdAt || new Date().toISOString(), created_at: pick.created_at || pick.createdAt || new Date().toISOString(),
     updatedAt: pick.updated_at || pick.updatedAt || new Date().toISOString(), updated_at: pick.updated_at || pick.updatedAt || new Date().toISOString(),
-    current_price: pick.current_price || pick.currentPrice, currentPrice: pick.current_price || pick.currentPrice,
-    price_change_percent: pick.price_change_percent || pick.priceChangePercent, priceChangePercent: pick.price_change_percent || pick.priceChangePercent,
+    current_price: pick.current_price || pick.currentPrice || null, currentPrice: pick.current_price || pick.currentPrice || null,
+    price_change_percent: pick.price_change_percent || pick.priceChangePercent || null, priceChangePercent: pick.price_change_percent || pick.priceChangePercent || null,
     ai_display_name: aiDisplayName,
     ai_color: aiColor
   };
@@ -142,13 +162,18 @@ export async function getAIModels(): Promise<AIModel[]> {
   try {
     const { data } = await supabase.from('ai_models').select('*').eq('is_active', true).order('display_name');
     if (data?.length) return data.map(m => ({ id: m.id, name: m.name, displayName: m.display_name, display_name: m.display_name, provider: m.provider, color: m.color, description: m.description, strengths: m.strengths || [], isActive: m.is_active, is_active: m.is_active }));
-  } catch (e) { console.log('Using in-memory AI models'); }
-  return AI_MODELS;
+  } catch (e) {}
+  return [
+    { id: 'gpt4', name: 'gpt4', displayName: 'GPT-4', display_name: 'GPT-4', provider: 'openai', color: '#10b981', isActive: true, is_active: true },
+    { id: 'claude', name: 'claude', displayName: 'Claude', display_name: 'Claude', provider: 'anthropic', color: '#8b5cf6', isActive: true, is_active: true },
+    { id: 'gemini', name: 'gemini', displayName: 'Gemini', display_name: 'Gemini', provider: 'google', color: '#3b82f6', isActive: true, is_active: true },
+    { id: 'perplexity', name: 'perplexity', displayName: 'Perplexity', display_name: 'Perplexity', provider: 'perplexity', color: '#06b6d4', isActive: true, is_active: true }
+  ];
 }
 
 export async function getPicks(filters?: { aiModelId?: string; symbol?: string; status?: string; direction?: string; assetType?: AssetType; limit?: number }): Promise<StockPick[]> {
   try {
-    let query = supabase.from('stock_picks').select('*, ai_models(*)');
+    let query = supabase.from('ai_stock_picks').select('*, ai_models(*)');
     if (filters?.aiModelId) query = query.eq('ai_model_id', filters.aiModelId);
     if (filters?.symbol) query = query.eq('symbol', filters.symbol.toUpperCase());
     if (filters?.status) query = query.eq('status', filters.status);
@@ -156,10 +181,62 @@ export async function getPicks(filters?: { aiModelId?: string; symbol?: string; 
     if (filters?.assetType) query = query.eq('asset_type', filters.assetType);
     query = query.order('created_at', { ascending: false });
     if (filters?.limit) query = query.limit(filters.limit);
+    
     const { data, error } = await query;
-    if (error) { console.error('Error:', error); return []; }
-    return (data || []).map(normalizePick);
-  } catch (e) { console.error('Error in getPicks:', e); return []; }
+    if (error) {
+      console.error('getPicks error:', error);
+      // Fallback to stock_picks table
+      let fallbackQuery = supabase.from('stock_picks').select('*, ai_models(*)');
+      if (filters?.aiModelId) fallbackQuery = fallbackQuery.eq('ai_model_id', filters.aiModelId);
+      if (filters?.symbol) fallbackQuery = fallbackQuery.eq('symbol', filters.symbol.toUpperCase());
+      if (filters?.status) fallbackQuery = fallbackQuery.eq('status', filters.status);
+      if (filters?.direction) fallbackQuery = fallbackQuery.eq('direction', filters.direction);
+      if (filters?.assetType) fallbackQuery = fallbackQuery.eq('asset_type', filters.assetType);
+      fallbackQuery = fallbackQuery.order('created_at', { ascending: false });
+      if (filters?.limit) fallbackQuery = fallbackQuery.limit(filters.limit);
+      const fallbackResult = await fallbackQuery;
+      if (fallbackResult.data) {
+        return enrichPicksWithPrices(fallbackResult.data.map(normalizePick));
+      }
+      return [];
+    }
+    
+    // Enrich picks with current prices
+    const picks = (data || []).map(normalizePick);
+    return enrichPicksWithPrices(picks);
+  } catch (e) { 
+    console.error('Error in getPicks:', e); 
+    return []; 
+  }
+}
+
+// Enrich picks with current prices and calculate price change
+async function enrichPicksWithPrices(picks: StockPick[]): Promise<StockPick[]> {
+  const uniqueSymbols = [...new Set(picks.map(p => p.symbol))];
+  const priceMap = new Map<string, number>();
+  
+  // Fetch prices for all unique symbols (batch)
+  await Promise.all(
+    uniqueSymbols.slice(0, 10).map(async (symbol) => { // Limit to 10 to avoid rate limits
+      const price = await fetchCurrentPrice(symbol);
+      if (price) priceMap.set(symbol, price);
+    })
+  );
+  
+  // Enrich picks with fetched prices
+  return picks.map(pick => {
+    const currentPrice = priceMap.get(pick.symbol) || pick.current_price || pick.entry_price;
+    const entryPrice = pick.entry_price || pick.entryPrice || 0;
+    const priceChange = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0;
+    
+    return {
+      ...pick,
+      current_price: currentPrice,
+      currentPrice: currentPrice,
+      price_change_percent: priceChange,
+      priceChangePercent: priceChange
+    };
+  });
 }
 
 export async function getStockPicks(filters?: { aiModelId?: string; status?: string; limit?: number }): Promise<StockPick[]> { return getPicks({ ...filters, assetType: 'stock' as AssetType }); }
@@ -197,45 +274,54 @@ export async function getOverallStats(): Promise<OverallStats> {
   const totalReturn = closedPicks.reduce((sum, p) => sum + ((p.actualReturn || p.actual_return) || 0), 0);
   const avgConfidence = allPicks.length > 0 ? allPicks.reduce((sum, p) => sum + p.confidence, 0) / allPicks.length : 0;
   const stats = await getAIStatistics();
-  return { totalPicks: allPicks.length, activePicks: activePicks.length, closedPicks: closedPicks.length, overallWinRate: closedPicks.length > 0 ? (winningPicks.length / closedPicks.length) * 100 : 0, totalReturn, avgConfidence: Math.round(avgConfidence), bestAI: stats[0]?.displayName || 'N/A', worstAI: stats[stats.length - 1]?.displayName || 'N/A', stockPicks: allPicks.filter(p => p.assetType === 'stock' || p.asset_type === 'stock').length, pennyStockPicks: allPicks.filter(p => p.assetType === 'penny_stock' || p.asset_type === 'penny_stock').length, cryptoPicks: allPicks.filter(p => p.assetType === 'crypto' || p.asset_type === 'crypto').length };
-}
-
-export async function getRecentWinners(limit: number = 5, assetType?: AssetType): Promise<StockPick[]> {
-  const closedPicks = assetType ? await getPicks({ status: 'closed', assetType }) : await getPicks({ status: 'closed' });
-  return closedPicks.filter(p => ((p.actualReturn || p.actual_return) || 0) > 0).sort((a, b) => new Date(b.closedAt || b.closed_at || b.createdAt || '').getTime() - new Date(a.closedAt || a.closed_at || a.createdAt || '').getTime()).slice(0, limit);
-}
-
-export async function getCompetitionLeaderboard(): Promise<CompetitionLeaderboard[]> {
-  const models = await getAIModels();
-  const [stockStats, pennyStats, cryptoStats] = await Promise.all([getAIStatistics('stock'), getAIStatistics('penny_stock'), getAIStatistics('crypto')]);
-  const calcPoints = (stats?: AIStatistics) => { if (!stats || stats.totalPicks === 0) return 0; return stats.winRate * 0.4 + Math.max(0, stats.avgReturn * 10) * 0.4 + (stats.streakType === 'winning' ? stats.recentStreak * 5 : 0); };
-  const leaderboard = models.map(model => {
-    const stock = stockStats.find(s => s.aiModelId === model.id), penny = pennyStats.find(s => s.aiModelId === model.id), crypto = cryptoStats.find(s => s.aiModelId === model.id);
-    const stockPoints = calcPoints(stock), pennyStockPoints = calcPoints(penny), cryptoPoints = calcPoints(crypto);
-    return { aiModelId: model.id, displayName: model.displayName || model.display_name, color: model.color, totalPoints: stockPoints + pennyStockPoints + cryptoPoints, stockPoints, pennyStockPoints, cryptoPoints, rank: 0, streak: Math.max(stock?.streakType === 'winning' ? stock.recentStreak : 0, penny?.streakType === 'winning' ? penny.recentStreak : 0, crypto?.streakType === 'winning' ? crypto.recentStreak : 0) };
-  });
-  leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-  leaderboard.forEach((item, i) => { item.rank = i + 1; });
-  return leaderboard;
+  const topAIModel = stats.length > 0 ? stats[0] : null;
+  const sortedByReturn = [...closedPicks].sort((a, b) => ((b.actualReturn || b.actual_return) || 0) - ((a.actualReturn || a.actual_return) || 0));
+  return {
+    totalPicks: allPicks.length, activePicks: activePicks.length, closedPicks: closedPicks.length,
+    winRate: closedPicks.length > 0 ? (winningPicks.length / closedPicks.length) * 100 : 0,
+    avgConfidence: Math.round(avgConfidence), totalProfitLoss: totalReturn,
+    topAI: topAIModel?.displayName || 'N/A',
+    bestPick: sortedByReturn[0] || null, worstPick: sortedByReturn[sortedByReturn.length - 1] || null
+  };
 }
 
 export async function searchStocks(query: string): Promise<StockInfo[]> {
   if (!query || query.length < 1) return [];
   const upper = query.toUpperCase(), lower = query.toLowerCase();
-  try { const { data } = await supabase.from('stocks').select('symbol, name, exchange, sector, industry').or(`symbol.ilike.%${upper}%,name.ilike.%${lower}%`).limit(20); if (data?.length) return data; } catch (e) {}
-  return [{ symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType }, { symbol: 'MSFT', name: 'Microsoft', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType }, { symbol: 'NVDA', name: 'NVIDIA', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType }].filter(s => s.symbol.includes(upper) || s.name.toLowerCase().includes(lower));
+  try { 
+    const { data } = await supabase.from('stocks').select('symbol, name, exchange, sector, industry').or(`symbol.ilike.%${upper}%,name.ilike.%${lower}%`).limit(20); 
+    if (data?.length) return data; 
+  } catch (e) {}
+  return [
+    { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType },
+    { symbol: 'MSFT', name: 'Microsoft', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType },
+    { symbol: 'NVDA', name: 'NVIDIA', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType },
+    { symbol: 'GOOGL', name: 'Alphabet', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType },
+    { symbol: 'AMZN', name: 'Amazon', exchange: 'NASDAQ', sector: 'Consumer Cyclical', assetType: 'stock' as AssetType },
+    { symbol: 'TSLA', name: 'Tesla', exchange: 'NASDAQ', sector: 'Automotive', assetType: 'stock' as AssetType }
+  ].filter(s => s.symbol.includes(upper) || s.name.toLowerCase().includes(lower));
 }
 
 export async function searchCrypto(query: string): Promise<CryptoInfo[]> {
   if (!query || query.length < 1) return [];
   const upper = query.toUpperCase(), lower = query.toLowerCase();
-  return [{ symbol: 'BTC', name: 'Bitcoin', exchange: 'Crypto' }, { symbol: 'ETH', name: 'Ethereum', exchange: 'Crypto' }, { symbol: 'SOL', name: 'Solana', exchange: 'Crypto' }].filter(c => c.symbol.includes(upper) || c.name.toLowerCase().includes(lower));
+  return [
+    { symbol: 'BTC', name: 'Bitcoin', exchange: 'Crypto' },
+    { symbol: 'ETH', name: 'Ethereum', exchange: 'Crypto' },
+    { symbol: 'SOL', name: 'Solana', exchange: 'Crypto' },
+    { symbol: 'XRP', name: 'Ripple', exchange: 'Crypto' },
+    { symbol: 'DOGE', name: 'Dogecoin', exchange: 'Crypto' }
+  ].filter(c => c.symbol.includes(upper) || c.name.toLowerCase().includes(lower));
 }
 
 export async function searchPennyStocks(query: string): Promise<StockInfo[]> {
   if (!query || query.length < 1) return [];
   const upper = query.toUpperCase(), lower = query.toLowerCase();
-  return [{ symbol: 'SNDL', name: 'Sundial Growers', exchange: 'NASDAQ', sector: 'Healthcare', assetType: 'penny_stock' as AssetType }].filter(s => s.symbol.includes(upper) || s.name.toLowerCase().includes(lower));
+  return [
+    { symbol: 'SNDL', name: 'Sundial Growers', exchange: 'NASDAQ', sector: 'Healthcare', assetType: 'penny_stock' as AssetType },
+    { symbol: 'NAKD', name: 'Naked Brands', exchange: 'NASDAQ', sector: 'Retail', assetType: 'penny_stock' as AssetType },
+    { symbol: 'CTRM', name: 'Castor Maritime', exchange: 'NASDAQ', sector: 'Shipping', assetType: 'penny_stock' as AssetType }
+  ].filter(s => s.symbol.includes(upper) || s.name.toLowerCase().includes(lower));
 }
 
 export async function getHotPicks(limit: number = 10, assetType?: AssetType): Promise<StockPick[]> { return getPicks({ status: 'active', limit, assetType }); }
@@ -245,10 +331,27 @@ export async function getHotCrypto(limit: number = 10): Promise<StockPick[]> { r
 
 export async function savePick(pick: Partial<StockPick>): Promise<StockPick | null> {
   try {
-    const { data, error } = await supabase.from('stock_picks').insert({ ai_model_id: pick.aiModelId || pick.ai_model_id, asset_type: pick.assetType || pick.asset_type || 'stock', symbol: (pick.symbol || pick.ticker || '').toUpperCase(), company_name: pick.companyName || pick.company_name, sector: pick.sector, direction: pick.direction, confidence: pick.confidence, entry_price: pick.entryPrice || pick.entry_price, target_price: pick.targetPrice || pick.target_price, stop_loss: pick.stopLoss || pick.stop_loss, timeframe: pick.timeframe, thesis: pick.thesis, reasoning: pick.reasoning, key_bullish_factors: pick.keyBullishFactors || pick.key_bullish_factors, key_bearish_factors: pick.keyBearishFactors || pick.key_bearish_factors, risks: pick.risks, catalysts: pick.catalysts, status: 'active' }).select().single();
+    const { data, error } = await supabase.from('ai_stock_picks').insert({ 
+      ai_model_id: pick.aiModelId || pick.ai_model_id, 
+      asset_type: pick.assetType || pick.asset_type || 'stock', 
+      symbol: (pick.symbol || pick.ticker || '').toUpperCase(), 
+      company_name: pick.companyName || pick.company_name, 
+      sector: pick.sector, 
+      direction: pick.direction, 
+      confidence: pick.confidence, 
+      entry_price: pick.entryPrice || pick.entry_price, 
+      target_price: pick.targetPrice || pick.target_price, 
+      stop_loss: pick.stopLoss || pick.stop_loss, 
+      timeframe: pick.timeframe, 
+      thesis: pick.thesis, 
+      reasoning: pick.reasoning, 
+      key_bullish_factors: pick.keyBullishFactors || pick.key_bullish_factors, 
+      key_bearish_factors: pick.keyBearishFactors || pick.key_bearish_factors, 
+      risks: pick.risks, 
+      catalysts: pick.catalysts, 
+      status: 'active' 
+    }).select().single();
     if (error) { console.error('Error:', error); return null; }
     return data ? normalizePick(data) : null;
   } catch (e) { console.error('Error in savePick:', e); return null; }
 }
-
-
