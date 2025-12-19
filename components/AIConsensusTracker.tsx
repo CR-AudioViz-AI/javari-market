@@ -42,7 +42,7 @@ export function AIConsensusTracker() {
             avgConfidence,
             avgGain,
             consensusScore,
-            ais: picks.map((p: any) => p.ai_name)
+            ais: picks.map((p: any) => p.ai_display_name)
           }
         })
         .filter(c => c.aiCount >= 2) // Only show stocks with 2+ AI picks
@@ -143,4 +143,5 @@ export function AIConsensusTracker() {
     </div>
   )
 }
+
 
