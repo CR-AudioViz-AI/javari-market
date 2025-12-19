@@ -83,7 +83,7 @@ export default function AlertsComplete() {
           if (!acc.find(s => s.ticker === pick.ticker)) {
             acc.push({
               ticker: pick.ticker,
-              ai_name: pick.ai_name,
+              ai_name: pick.ai_display_name,
               current_price: pick.current_price || pick.price
             });
           }
@@ -472,3 +472,4 @@ export default function AlertsComplete() {
     </div>
   );
 }
+
