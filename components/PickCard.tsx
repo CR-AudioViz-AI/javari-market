@@ -153,11 +153,13 @@ export function PickCard({
         </span>
         <span className={`px-2 py-0.5 rounded text-xs ${
           pick.status === 'active' ? 'bg-yellow-900/50 text-yellow-400' :
-          pick.status === 'won' ? 'bg-emerald-900/50 text-emerald-400' :
-          pick.status === 'lost' ? 'bg-red-900/50 text-red-400' :
+          pick.status === 'closed' && (pick.actual_return ?? 0) > 0 ? 'bg-emerald-900/50 text-emerald-400' :
+          pick.status === 'closed' && (pick.actual_return ?? 0) <= 0 ? 'bg-red-900/50 text-red-400' :
           'bg-gray-700 text-gray-400'
         }`}>
-          {pick.status?.toUpperCase() || 'ACTIVE'}
+          {pick.status === 'active' ? 'ACTIVE' : 
+           pick.status === 'closed' ? ((pick.actual_return ?? 0) > 0 ? 'WON' : 'LOST') : 
+           pick.status?.toUpperCase() || 'PENDING'}
         </span>
       </div>
       
@@ -261,4 +263,5 @@ export function PickCardMini({ pick }: { pick: StockPick }) {
 }
 
 export default PickCard;
+
 
