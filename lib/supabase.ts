@@ -1,10 +1,17 @@
 // lib/supabase.ts
 // CR AudioViz AI - Market Oracle Database & Price Functions
-// TIMESTAMP: 2025-12-19 17:55 EST
+// TIMESTAMP: 2025-12-20 08:35 EST
+// FIX: Added missing exports - supabase, getCompetitionLeaderboard, getRecentWinners, createSupabaseBrowserClient
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-const supabase = createClientComponentClient();
+// Export the supabase client directly for backward compatibility
+export const supabase = createClientComponentClient();
+
+// Export function to create browser client (for AuthProvider compatibility)
+export function createSupabaseBrowserClient() {
+  return createClientComponentClient();
+}
 
 // Asset Types
 export type AssetType = 'stock' | 'penny_stock' | 'crypto';
@@ -81,6 +88,37 @@ export interface OverallStats {
   bestPick: StockPick | null; worstPick: StockPick | null;
 }
 
+// Competition Leaderboard Interface
+export interface CompetitionLeaderboard {
+  rank: number;
+  aiModelId: string;
+  displayName: string;
+  color: string;
+  totalPicks: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalReturn: number;
+  avgReturn: number;
+  bestPick?: { symbol: string; return: number };
+  streak: number;
+  streakType: 'winning' | 'losing' | 'none';
+  badges: string[];
+}
+
+// Recent Winner Interface
+export interface RecentWinner {
+  id: string;
+  symbol: string;
+  companyName: string;
+  aiModelId: string;
+  aiDisplayName: string;
+  aiColor: string;
+  actualReturn: number;
+  closedAt: string;
+  direction: 'UP' | 'DOWN' | 'HOLD';
+}
+
 export const AI_MODELS = {
   GPT4: { id: 'gpt4', name: 'GPT-4', color: '#10b981' },
   CLAUDE: { id: 'claude', name: 'Claude', color: '#8b5cf6' },
@@ -121,38 +159,38 @@ async function fetchCurrentPrice(symbol: string): Promise<number | null> {
 }
 
 // Normalize pick from database
-function normalizePick(pick: any): StockPick {
-  const aiModel = pick.ai_models || pick.aiModel || pick.ai_model;
+function normalizePick(pick: Record<string, unknown>): StockPick {
+  const aiModel = (pick.ai_models || pick.aiModel || pick.ai_model) as AIModel | undefined;
   const aiDisplayName = aiModel?.display_name || aiModel?.displayName || aiModel?.name || 'AI';
   const aiColor = aiModel?.color || '#6366f1';
-  const symbolValue = pick.symbol || pick.ticker || '';
-  const assetTypeValue = pick.asset_type || pick.assetType || 'stock';
+  const symbolValue = (pick.symbol || pick.ticker || '') as string;
+  const assetTypeValue = (pick.asset_type || pick.assetType || 'stock') as AssetType;
   
   return {
-    id: pick.id,
+    id: pick.id as string,
     assetType: assetTypeValue, asset_type: assetTypeValue,
-    aiModelId: pick.ai_model_id || pick.aiModelId || '', ai_model_id: pick.ai_model_id || pick.aiModelId || '',
+    aiModelId: (pick.ai_model_id || pick.aiModelId || '') as string, ai_model_id: (pick.ai_model_id || pick.aiModelId || '') as string,
     aiModel: aiModel, ai_model: aiModel,
     symbol: symbolValue, ticker: symbolValue,
-    companyName: pick.company_name || pick.companyName || symbolValue, company_name: pick.company_name || pick.companyName || symbolValue,
-    sector: pick.sector || 'Unknown',
-    direction: pick.direction || 'HOLD',
-    confidence: pick.confidence || 0,
-    entryPrice: pick.entry_price || pick.entryPrice || 0, entry_price: pick.entry_price || pick.entryPrice || 0,
-    targetPrice: pick.target_price || pick.targetPrice || 0, target_price: pick.target_price || pick.targetPrice || 0,
-    stopLoss: pick.stop_loss || pick.stopLoss || 0, stop_loss: pick.stop_loss || pick.stopLoss || 0,
-    timeframe: pick.timeframe || '1-3 months', thesis: pick.thesis || '', reasoning: pick.reasoning || '',
-    keyBullishFactors: pick.key_bullish_factors || pick.keyBullishFactors || [], key_bullish_factors: pick.key_bullish_factors || pick.keyBullishFactors || [],
-    keyBearishFactors: pick.key_bearish_factors || pick.keyBearishFactors || [], key_bearish_factors: pick.key_bearish_factors || pick.keyBearishFactors || [],
-    risks: pick.risks || [], catalysts: pick.catalysts || [],
-    status: pick.status || 'active',
-    actualExitPrice: pick.actual_exit_price || pick.actualExitPrice, actual_exit_price: pick.actual_exit_price || pick.actualExitPrice,
-    actualReturn: pick.actual_return || pick.actualReturn, actual_return: pick.actual_return || pick.actualReturn,
-    closedAt: pick.closed_at || pick.closedAt, closed_at: pick.closed_at || pick.closedAt,
-    createdAt: pick.created_at || pick.createdAt || new Date().toISOString(), created_at: pick.created_at || pick.createdAt || new Date().toISOString(),
-    updatedAt: pick.updated_at || pick.updatedAt || new Date().toISOString(), updated_at: pick.updated_at || pick.updatedAt || new Date().toISOString(),
-    current_price: pick.current_price || pick.currentPrice || null, currentPrice: pick.current_price || pick.currentPrice || null,
-    price_change_percent: pick.price_change_percent || pick.priceChangePercent || null, priceChangePercent: pick.price_change_percent || pick.priceChangePercent || null,
+    companyName: (pick.company_name || pick.companyName || symbolValue) as string, company_name: (pick.company_name || pick.companyName || symbolValue) as string,
+    sector: (pick.sector || 'Unknown') as string,
+    direction: (pick.direction || 'HOLD') as 'UP' | 'DOWN' | 'HOLD',
+    confidence: (pick.confidence || 0) as number,
+    entryPrice: (pick.entry_price || pick.entryPrice || 0) as number, entry_price: (pick.entry_price || pick.entryPrice || 0) as number,
+    targetPrice: (pick.target_price || pick.targetPrice || 0) as number, target_price: (pick.target_price || pick.targetPrice || 0) as number,
+    stopLoss: (pick.stop_loss || pick.stopLoss || 0) as number, stop_loss: (pick.stop_loss || pick.stopLoss || 0) as number,
+    timeframe: (pick.timeframe || '1-3 months') as string, thesis: (pick.thesis || '') as string, reasoning: (pick.reasoning || '') as string,
+    keyBullishFactors: (pick.key_bullish_factors || pick.keyBullishFactors || []) as string[], key_bullish_factors: (pick.key_bullish_factors || pick.keyBullishFactors || []) as string[],
+    keyBearishFactors: (pick.key_bearish_factors || pick.keyBearishFactors || []) as string[], key_bearish_factors: (pick.key_bearish_factors || pick.keyBearishFactors || []) as string[],
+    risks: (pick.risks || []) as string[], catalysts: (pick.catalysts || []) as string[],
+    status: (pick.status || 'active') as 'active' | 'closed' | 'expired',
+    actualExitPrice: pick.actual_exit_price as number | undefined, actual_exit_price: pick.actual_exit_price as number | undefined,
+    actualReturn: pick.actual_return as number | undefined, actual_return: pick.actual_return as number | undefined,
+    closedAt: pick.closed_at as string | undefined, closed_at: pick.closed_at as string | undefined,
+    createdAt: (pick.created_at || pick.createdAt || new Date().toISOString()) as string, created_at: (pick.created_at || pick.createdAt || new Date().toISOString()) as string,
+    updatedAt: (pick.updated_at || pick.updatedAt || new Date().toISOString()) as string, updated_at: (pick.updated_at || pick.updatedAt || new Date().toISOString()) as string,
+    current_price: (pick.current_price || pick.currentPrice || null) as number | undefined, currentPrice: (pick.current_price || pick.currentPrice || null) as number | undefined,
+    price_change_percent: (pick.price_change_percent || pick.priceChangePercent || null) as number | undefined, priceChangePercent: (pick.price_change_percent || pick.priceChangePercent || null) as number | undefined,
     ai_display_name: aiDisplayName,
     ai_color: aiColor
   };
@@ -162,7 +200,9 @@ export async function getAIModels(): Promise<AIModel[]> {
   try {
     const { data } = await supabase.from('ai_models').select('*').eq('is_active', true).order('display_name');
     if (data?.length) return data.map(m => ({ id: m.id, name: m.name, displayName: m.display_name, display_name: m.display_name, provider: m.provider, color: m.color, description: m.description, strengths: m.strengths || [], isActive: m.is_active, is_active: m.is_active }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('Error fetching AI models:', e);
+  }
   return [
     { id: 'gpt4', name: 'gpt4', displayName: 'GPT-4', display_name: 'GPT-4', provider: 'openai', color: '#10b981', isActive: true, is_active: true },
     { id: 'claude', name: 'claude', displayName: 'Claude', display_name: 'Claude', provider: 'anthropic', color: '#8b5cf6', isActive: true, is_active: true },
@@ -285,13 +325,104 @@ export async function getOverallStats(): Promise<OverallStats> {
   };
 }
 
+// NEW FUNCTION: Get Competition Leaderboard
+export async function getCompetitionLeaderboard(assetType?: AssetType): Promise<CompetitionLeaderboard[]> {
+  const stats = await getAIStatistics(assetType);
+  
+  return stats.map((stat, index) => {
+    // Determine badges based on performance
+    const badges: string[] = [];
+    if (index === 0) badges.push('🏆 Champion');
+    if (stat.winRate >= 70) badges.push('🎯 Sharpshooter');
+    if (stat.recentStreak >= 5) badges.push('🔥 On Fire');
+    if (stat.avgReturn >= 10) badges.push('💰 Big Winner');
+    if (stat.totalPicks >= 50) badges.push('📊 Veteran');
+    
+    return {
+      rank: index + 1,
+      aiModelId: stat.aiModelId,
+      displayName: stat.displayName,
+      color: stat.color,
+      totalPicks: stat.totalPicks,
+      wins: stat.winningPicks,
+      losses: stat.losingPicks,
+      winRate: stat.winRate,
+      totalReturn: stat.totalProfitLossPercent,
+      avgReturn: stat.avgReturn,
+      bestPick: stat.bestPick ? { 
+        symbol: stat.bestPick.symbol, 
+        return: stat.bestPick.actualReturn || stat.bestPick.actual_return || 0 
+      } : undefined,
+      streak: stat.recentStreak,
+      streakType: stat.streakType,
+      badges
+    };
+  });
+}
+
+// NEW FUNCTION: Get Recent Winners (closed picks with positive returns)
+export async function getRecentWinners(limit: number = 10): Promise<RecentWinner[]> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_stock_picks')
+      .select('*, ai_models(*)')
+      .eq('status', 'closed')
+      .gt('actual_return', 0)
+      .order('closed_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      // Fallback to stock_picks table
+      const { data: fallbackData } = await supabase
+        .from('stock_picks')
+        .select('*, ai_models(*)')
+        .eq('status', 'closed')
+        .gt('actual_return', 0)
+        .order('closed_at', { ascending: false })
+        .limit(limit);
+      
+      if (fallbackData?.length) {
+        return fallbackData.map(pick => ({
+          id: pick.id,
+          symbol: pick.symbol || pick.ticker,
+          companyName: pick.company_name || pick.companyName || pick.symbol,
+          aiModelId: pick.ai_model_id,
+          aiDisplayName: pick.ai_models?.display_name || pick.ai_models?.name || 'AI',
+          aiColor: pick.ai_models?.color || '#6366f1',
+          actualReturn: pick.actual_return || 0,
+          closedAt: pick.closed_at || new Date().toISOString(),
+          direction: pick.direction || 'UP'
+        }));
+      }
+      return [];
+    }
+    
+    return (data || []).map(pick => ({
+      id: pick.id,
+      symbol: pick.symbol || pick.ticker,
+      companyName: pick.company_name || pick.companyName || pick.symbol,
+      aiModelId: pick.ai_model_id,
+      aiDisplayName: pick.ai_models?.display_name || pick.ai_models?.name || 'AI',
+      aiColor: pick.ai_models?.color || '#6366f1',
+      actualReturn: pick.actual_return || 0,
+      closedAt: pick.closed_at || new Date().toISOString(),
+      direction: pick.direction || 'UP'
+    }));
+  } catch (e) {
+    console.error('Error in getRecentWinners:', e);
+    return [];
+  }
+}
+
 export async function searchStocks(query: string): Promise<StockInfo[]> {
   if (!query || query.length < 1) return [];
   const upper = query.toUpperCase(), lower = query.toLowerCase();
   try { 
     const { data } = await supabase.from('stocks').select('symbol, name, exchange, sector, industry').or(`symbol.ilike.%${upper}%,name.ilike.%${lower}%`).limit(20); 
     if (data?.length) return data; 
-  } catch (e) {}
+  } catch (e) {
+    console.error('Error searching stocks:', e);
+  }
   return [
     { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType },
     { symbol: 'MSFT', name: 'Microsoft', exchange: 'NASDAQ', sector: 'Technology', assetType: 'stock' as AssetType },
