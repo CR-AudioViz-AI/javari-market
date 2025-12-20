@@ -215,8 +215,8 @@ export default function PennyStocksPage() {
             className="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm"
           >
             <option value="all">All AIs</option>
-            {Object.values(AI_MODELS).map(model => (
-              <option key={model.id} value={model.id}>{model.displayName}</option>
+            {AI_MODELS.map(model => (
+              <option key={model.id} value={model.id}>{model.name}</option>
             ))}
           </select>
           
