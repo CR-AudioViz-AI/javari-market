@@ -361,23 +361,36 @@ export async function getCompetitionLeaderboard(assetType?: AssetType): Promise<
 }
 
 // NEW FUNCTION: Get Recent Winners (closed picks with positive returns)
-export async function getRecentWinners(limit: number = 10): Promise<RecentWinner[]> {
+export async function getRecentWinners(limit: number = 10, assetType?: AssetType): Promise<RecentWinner[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('ai_stock_picks')
       .select('*, ai_models(*)')
       .eq('status', 'closed')
-      .gt('actual_return', 0)
+      .gt('actual_return', 0);
+    
+    // Filter by asset type if provided
+    if (assetType) {
+      query = query.eq('asset_type', assetType);
+    }
+    
+    const { data, error } = await query
       .order('closed_at', { ascending: false })
       .limit(limit);
     
     if (error) {
       // Fallback to stock_picks table
-      const { data: fallbackData } = await supabase
+      let fallbackQuery = supabase
         .from('stock_picks')
         .select('*, ai_models(*)')
         .eq('status', 'closed')
-        .gt('actual_return', 0)
+        .gt('actual_return', 0);
+      
+      if (assetType) {
+        fallbackQuery = fallbackQuery.eq('asset_type', assetType);
+      }
+      
+      const { data: fallbackData } = await fallbackQuery
         .order('closed_at', { ascending: false })
         .limit(limit);
       
