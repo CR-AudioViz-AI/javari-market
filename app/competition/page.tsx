@@ -1,420 +1,475 @@
+// app/competition/page.tsx
+// Market Oracle - Tiered AI Competition Page
+// Created: December 21, 2025
+
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import {
-  Trophy, TrendingUp, TrendingDown, Medal, Crown,
-  Zap, Bitcoin, BarChart3, Target, Flame, Star,
-  ArrowUpRight, ArrowDownRight, RefreshCw, Award
-} from 'lucide-react';
 import { 
-  getCompetitionLeaderboard, getAIStatistics, getOverallStats,
-  type CompetitionLeaderboard, type AIStatistics, type OverallStats, AI_MODELS 
-} from '@/lib/supabase';
-import { JavariHelpButton } from '@/components/JavariWidget';
+  Trophy, 
+  Flame,
+  Crown,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  Calendar,
+  Swords,
+  Target,
+  Award
+} from 'lucide-react';
+
+// Tier configurations
+const TIERS = {
+  small: {
+    id: 'small',
+    name: 'Small Tier',
+    icon: '🥉',
+    color: 'amber',
+    gradient: 'from-amber-500 to-yellow-600',
+    bgGradient: 'from-amber-500/10 to-yellow-600/10',
+    borderColor: 'border-amber-500/30',
+    description: 'Fast, cost-efficient models',
+  },
+  medium: {
+    id: 'medium',
+    name: 'Medium Tier',
+    icon: '🥈',
+    color: 'slate',
+    gradient: 'from-slate-400 to-gray-500',
+    bgGradient: 'from-slate-400/10 to-gray-500/10',
+    borderColor: 'border-slate-400/30',
+    description: 'Balanced reasoning power',
+  },
+  large: {
+    id: 'large',
+    name: 'Large Tier',
+    icon: '🥇',
+    color: 'yellow',
+    gradient: 'from-yellow-400 to-amber-500',
+    bgGradient: 'from-yellow-400/10 to-amber-500/10',
+    borderColor: 'border-yellow-400/30',
+    description: 'Premium flagship models',
+  },
+};
+
+// Mock data for AI competitors
+const AI_COMPETITORS = {
+  small: [
+    { id: 'gpt-4o-mini', name: 'GPT Swift', avatar: '⚡', provider: 'OpenAI', points: 847, wins: 34, losses: 12, winRate: 73.9, streak: 5, rank: 1, prevRank: 2, avgReturn: 8.2 },
+    { id: 'claude-haiku', name: 'Claude Swift', avatar: '🎋', provider: 'Anthropic', points: 812, wins: 31, losses: 14, winRate: 68.9, streak: 2, rank: 2, prevRank: 1, avgReturn: 7.1 },
+    { id: 'gemini-flash', name: 'Gemini Flash', avatar: '⚡', provider: 'Google', points: 756, wins: 29, losses: 16, winRate: 64.4, streak: -1, rank: 3, prevRank: 3, avgReturn: 5.9 },
+    { id: 'groq-llama-8b', name: 'Llama Quick', avatar: '🦙', provider: 'Groq', points: 698, wins: 26, losses: 19, winRate: 57.8, streak: 3, rank: 4, prevRank: 5, avgReturn: 4.8 },
+    { id: 'groq-mixtral', name: 'Mixtral Mix', avatar: '🎰', provider: 'Groq', points: 645, wins: 24, losses: 21, winRate: 53.3, streak: -2, rank: 5, prevRank: 4, avgReturn: 3.2 },
+  ],
+  medium: [
+    { id: 'claude-sonnet', name: 'Claude Analyst', avatar: '🎯', provider: 'Anthropic', points: 1124, wins: 42, losses: 13, winRate: 76.4, streak: 7, rank: 1, prevRank: 1, avgReturn: 11.3 },
+    { id: 'gpt-4o', name: 'GPT Balanced', avatar: '⚡', provider: 'OpenAI', points: 1089, wins: 40, losses: 15, winRate: 72.7, streak: 4, rank: 2, prevRank: 2, avgReturn: 9.8 },
+    { id: 'groq-llama-70b', name: 'Llama Speedster', avatar: '🦙', provider: 'Groq', points: 987, wins: 36, losses: 19, winRate: 65.5, streak: 2, rank: 3, prevRank: 4, avgReturn: 7.4 },
+    { id: 'sonar', name: 'Perplexity Scout', avatar: '🔍', provider: 'Perplexity', points: 934, wins: 34, losses: 21, winRate: 61.8, streak: -1, rank: 4, prevRank: 3, avgReturn: 6.1 },
+  ],
+  large: [
+    { id: 'claude-opus', name: 'Claude Sage', avatar: '🧠', provider: 'Anthropic', points: 1456, wins: 51, losses: 11, winRate: 82.3, streak: 9, rank: 1, prevRank: 1, avgReturn: 14.7 },
+    { id: 'gpt-4-turbo', name: 'Oracle GPT', avatar: '🔮', provider: 'OpenAI', points: 1398, wins: 48, losses: 14, winRate: 77.4, streak: 3, rank: 2, prevRank: 2, avgReturn: 12.4 },
+    { id: 'gemini-pro', name: 'Gemini Titan', avatar: '💎', provider: 'Google', points: 1312, wins: 45, losses: 17, winRate: 72.6, streak: 5, rank: 3, prevRank: 3, avgReturn: 10.8 },
+    { id: 'sonar-pro', name: 'Perplexity Pro', avatar: '📡', provider: 'Perplexity', points: 1245, wins: 42, losses: 20, winRate: 67.7, streak: 1, rank: 4, prevRank: 4, avgReturn: 8.9 },
+  ],
+};
+
+// Javari - competes in all tiers
+const JAVARI = {
+  id: 'javari-prime',
+  name: 'Javari Prime',
+  avatar: '🏆',
+  provider: 'CR AudioViz AI',
+  points: 1678,
+  wins: 58,
+  losses: 9,
+  winRate: 86.6,
+  streak: 12,
+  avgReturn: 16.2,
+};
 
 export default function CompetitionPage() {
-  const [leaderboard, setLeaderboard] = useState<CompetitionLeaderboard[]>([]);
-  const [stockStats, setStockStats] = useState<AIStatistics[]>([]);
-  const [pennyStats, setPennyStats] = useState<AIStatistics[]>([]);
-  const [cryptoStats, setCryptoStats] = useState<AIStatistics[]>([]);
-  const [overallStats, setOverallStats] = useState<OverallStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<'overall' | 'stocks' | 'penny' | 'crypto'>('overall');
+  const [selectedTier, setSelectedTier] = useState<'small' | 'medium' | 'large'>('large');
+  const [showAllTiers, setShowAllTiers] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const getRankChangeIcon = (current: number, previous: number) => {
+    if (current < previous) return <ArrowUp className="w-4 h-4 text-emerald-400" />;
+    if (current > previous) return <ArrowDown className="w-4 h-4 text-red-400" />;
+    return <Minus className="w-4 h-4 text-gray-500" />;
+  };
 
-  async function loadData() {
-    setLoading(true);
-    try {
-      const [lb, stocks, penny, crypto, overall] = await Promise.all([
-        getCompetitionLeaderboard(),
-        getAIStatistics('stock'),
-        getAIStatistics('penny_stock'),
-        getAIStatistics('crypto'),
-        getOverallStats()
-      ]);
-      setLeaderboard(lb);
-      setStockStats(stocks);
-      setPennyStats(penny);
-      setCryptoStats(crypto);
-      setOverallStats(overall);
-    } catch (error) {
-      console.error('Error loading competition data:', error);
-    }
-    setLoading(false);
-  }
+  const getStreakDisplay = (streak: number) => {
+    if (streak >= 5) return <span className="text-emerald-400 flex items-center gap-1"><Flame className="w-4 h-4" />{streak}W</span>;
+    if (streak >= 3) return <span className="text-emerald-400">{streak}W</span>;
+    if (streak <= -3) return <span className="text-red-400">{Math.abs(streak)}L</span>;
+    if (streak > 0) return <span className="text-emerald-400">+{streak}</span>;
+    if (streak < 0) return <span className="text-red-400">{streak}</span>;
+    return <span className="text-gray-500">0</span>;
+  };
 
-  const getRankIcon = (rank: number) => {
+  const getRankBadge = (rank: number) => {
     switch (rank) {
-      case 1: return <Crown className="w-6 h-6 text-yellow-400" />;
-      case 2: return <Medal className="w-6 h-6 text-gray-300" />;
-      case 3: return <Medal className="w-6 h-6 text-amber-600" />;
-      default: return <span className="text-gray-500 font-bold">#{rank}</span>;
+      case 1: return <span className="text-2xl">🥇</span>;
+      case 2: return <span className="text-2xl">🥈</span>;
+      case 3: return <span className="text-2xl">🥉</span>;
+      default: return <span className="text-lg text-gray-400 font-bold">#{rank}</span>;
     }
   };
 
-  const getRankBorder = (rank: number) => {
-    switch (rank) {
-      case 1: return 'border-yellow-500/50 ring-2 ring-yellow-500/20 bg-yellow-500/5';
-      case 2: return 'border-gray-400/50 ring-1 ring-gray-400/20 bg-gray-400/5';
-      case 3: return 'border-amber-600/50 ring-1 ring-amber-600/20 bg-amber-600/5';
-      default: return 'border-gray-700/50';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <Trophy className="w-16 h-16 text-cyan-400 animate-pulse mx-auto mb-4" />
-          <p className="text-gray-400">Loading competition data...</p>
-        </div>
-      </div>
-    );
-  }
+  const currentQuarter = 'Q4';
+  const currentYear = 2025;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/20 via-blue-900/10 to-gray-950" />
-        <div className="absolute inset-0">
-          <div className="absolute top-10 left-1/4 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 py-16">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 mb-4">
-              <Trophy className="w-10 h-10 text-white" />
-            </div>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent mb-4">
-              AI Competition
-            </h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Watch AI models battle across Stocks, Penny Stocks, and Crypto
-            </p>
-            <JavariHelpButton topic="AI Competition" className="mt-4" />
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 py-8">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full px-4 py-2 mb-4">
+            <Trophy className="w-4 h-4 text-cyan-400" />
+            <span className="text-cyan-400 text-sm font-medium">AI Trading Competition</span>
           </div>
-          
-          {/* Overall Stats Banner */}
-          {overallStats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-              <div className="bg-gray-900/50 backdrop-blur border border-cyan-500/20 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-cyan-400">{overallStats.totalPicks}</div>
-                <div className="text-sm text-gray-400">Total Picks</div>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+            AI Battle Arena
+          </h1>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            Watch AI models compete head-to-head in stock predictions. 
+            Three tiers. One champion. Real results.
+          </p>
+        </div>
+
+        {/* Season Info Card */}
+        <div className="bg-gradient-to-r from-cyan-500/10 to-teal-500/10 border border-cyan-500/30 rounded-2xl p-6 mb-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center">
+                <Calendar className="w-8 h-8 text-white" />
               </div>
-              <div className="bg-gray-900/50 backdrop-blur border border-green-500/20 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-green-400">{overallStats.winRate.toFixed(1)}%</div>
-                <div className="text-sm text-gray-400">Overall Win Rate</div>
-              </div>
-              <div className="bg-gray-900/50 backdrop-blur border border-yellow-500/20 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-yellow-400">{overallStats.topAI}</div>
-                <div className="text-sm text-gray-400">Top Performer</div>
-              </div>
-              <div className="bg-gray-900/50 backdrop-blur border border-purple-500/20 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-purple-400">{overallStats.activePicks}</div>
-                <div className="text-sm text-gray-400">Active Picks</div>
+              <div>
+                <h2 className="text-xl font-bold text-white">{currentYear} Season - {currentQuarter}</h2>
+                <p className="text-gray-400">Quarterly Championship in progress</p>
               </div>
             </div>
-          )}
+            <div className="flex gap-6 text-center">
+              <div>
+                <div className="text-2xl font-bold text-cyan-400">67</div>
+                <div className="text-sm text-gray-500">Days Left</div>
+              </div>
+              <div className="border-l border-gray-700 pl-6">
+                <div className="text-2xl font-bold text-white">847</div>
+                <div className="text-sm text-gray-500">Total Picks</div>
+              </div>
+              <div className="border-l border-gray-700 pl-6">
+                <div className="text-2xl font-bold text-emerald-400">68.4%</div>
+                <div className="text-sm text-gray-500">Avg Win Rate</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Category Tabs */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {[
-            { id: 'overall', label: 'Overall', icon: Trophy, color: 'cyan' },
-            { id: 'stocks', label: 'Stocks', icon: TrendingUp, color: 'green' },
-            { id: 'penny', label: 'Penny Stocks', icon: Zap, color: 'yellow' },
-            { id: 'crypto', label: 'Crypto', icon: Bitcoin, color: 'purple' },
-          ].map((cat) => (
+        {/* Javari Prime Banner */}
+        <div className="bg-gradient-to-r from-purple-500/10 via-cyan-500/10 to-teal-500/10 border border-purple-500/30 rounded-2xl p-6 mb-8 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-cyan-500/5 animate-pulse" />
+          <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="text-6xl">{JAVARI.avatar}</div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-2xl font-bold text-white">{JAVARI.name}</h2>
+                  <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded-full font-medium">META-AI</span>
+                </div>
+                <p className="text-gray-400">Multi-AI Consensus Engine • Competes in ALL Tiers</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-6 text-center">
+              <div>
+                <div className="text-2xl font-bold text-cyan-400">{JAVARI.points.toLocaleString()}</div>
+                <div className="text-sm text-gray-500">Points</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-emerald-400">{JAVARI.winRate}%</div>
+                <div className="text-sm text-gray-500">Win Rate</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white flex items-center justify-center gap-1">
+                  <Flame className="w-5 h-5 text-orange-500" />{JAVARI.streak}
+                </div>
+                <div className="text-sm text-gray-500">Streak</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-amber-400">+{JAVARI.avgReturn}%</div>
+                <div className="text-sm text-gray-500">Avg Return</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tier Tabs */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          <button
+            onClick={() => setShowAllTiers(true)}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              showAllTiers
+                ? 'bg-cyan-500 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            All Tiers
+          </button>
+          {Object.entries(TIERS).map(([key, tier]) => (
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id as typeof selectedCategory)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
-                selectedCategory === cat.id
-                  ? `bg-${cat.color}-500 text-white shadow-lg shadow-${cat.color}-500/25`
-                  : 'bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700/50'
+              key={key}
+              onClick={() => {
+                setSelectedTier(key as 'small' | 'medium' | 'large');
+                setShowAllTiers(false);
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                !showAllTiers && selectedTier === key
+                  ? `bg-gradient-to-r ${tier.gradient} text-white`
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
-              style={selectedCategory === cat.id ? {
-                backgroundColor: cat.color === 'cyan' ? '#06b6d4' : 
-                                 cat.color === 'green' ? '#10b981' :
-                                 cat.color === 'yellow' ? '#f59e0b' : '#8b5cf6'
-              } : {}}
             >
-              <cat.icon className="w-5 h-5" />
-              {cat.label}
+              <span>{tier.icon}</span>
+              {tier.name}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Leaderboard */}
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">
-            {selectedCategory === 'overall' ? 'Overall Leaderboard' :
-             selectedCategory === 'stocks' ? 'Stock Picks Leaderboard' :
-             selectedCategory === 'penny' ? 'Penny Stock Leaderboard' :
-             'Crypto Leaderboard'}
-          </h2>
-          <button
-            onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-sm"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-        </div>
-
-        {/* Podium for Top 3 */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {/* 2nd Place */}
-          <div className="flex flex-col items-center pt-8">
-            {leaderboard[1] && (
-              <LeaderboardCard 
-                entry={leaderboard[1]} 
-                rank={2} 
-                category={selectedCategory}
-                stockStats={stockStats}
-                pennyStats={pennyStats}
-                cryptoStats={cryptoStats}
-              />
-            )}
-          </div>
-          {/* 1st Place */}
-          <div className="flex flex-col items-center">
-            {leaderboard[0] && (
-              <LeaderboardCard 
-                entry={leaderboard[0]} 
-                rank={1} 
-                category={selectedCategory}
-                stockStats={stockStats}
-                pennyStats={pennyStats}
-                cryptoStats={cryptoStats}
-                featured
-              />
-            )}
-          </div>
-          {/* 3rd Place */}
-          <div className="flex flex-col items-center pt-12">
-            {leaderboard[2] && (
-              <LeaderboardCard 
-                entry={leaderboard[2]} 
-                rank={3} 
-                category={selectedCategory}
-                stockStats={stockStats}
-                pennyStats={pennyStats}
-                cryptoStats={cryptoStats}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Rest of Leaderboard */}
-        {leaderboard.slice(3).map((entry, index) => (
-          <div
-            key={entry.aiModelId}
-            className={`bg-gray-900/50 backdrop-blur border rounded-xl p-4 mb-3 ${getRankBorder(index + 4)}`}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 text-center">
-                {getRankIcon(index + 4)}
-              </div>
-              <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg"
-                style={{ backgroundColor: entry.color + '20', color: entry.color }}
-              >
-                {entry.displayName.slice(0, 2)}
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold text-lg">{entry.displayName}</div>
-                <div className="text-sm text-gray-400">
-                  {entry.totalPoints.toFixed(0)} points
+        {/* Tier Leaderboards */}
+        {showAllTiers ? (
+          <div className="grid lg:grid-cols-3 gap-6">
+            {Object.entries(TIERS).map(([tierId, tier]) => (
+              <div key={tierId} className={`bg-gray-800/50 border ${tier.borderColor} rounded-2xl overflow-hidden`}>
+                <div className={`bg-gradient-to-r ${tier.bgGradient} p-4 border-b ${tier.borderColor}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{tier.icon}</span>
+                      <div>
+                        <h3 className="font-bold text-white">{tier.name}</h3>
+                        <p className="text-sm text-gray-400">{tier.description}</p>
+                      </div>
+                    </div>
+                    <Link 
+                      href={`/competition/${tierId}`}
+                      className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                    >
+                      View <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-700/50">
+                  {AI_COMPETITORS[tierId as keyof typeof AI_COMPETITORS].slice(0, 5).map((ai) => (
+                    <Link 
+                      key={ai.id} 
+                      href={`/ai/${ai.id}`}
+                      className="flex items-center gap-4 p-4 hover:bg-gray-700/30 transition"
+                    >
+                      <div className="w-8 text-center">{getRankBadge(ai.rank)}</div>
+                      <div className="text-2xl">{ai.avatar}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-white truncate">{ai.name}</div>
+                        <div className="text-sm text-gray-500">{ai.provider}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-white">{ai.points.toLocaleString()}</div>
+                        <div className="text-sm text-emerald-400">{ai.winRate}%</div>
+                      </div>
+                      <div className="w-8">{getRankChangeIcon(ai.rank, ai.prevRank)}</div>
+                    </Link>
+                  ))}
                 </div>
               </div>
-              <div className="flex gap-6 text-sm">
-                <div className="text-center">
-                  <div className="text-green-400 font-semibold">{entry.stockPoints.toFixed(0)}</div>
-                  <div className="text-xs text-gray-500">Stocks</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-yellow-400 font-semibold">{entry.pennyStockPoints.toFixed(0)}</div>
-                  <div className="text-xs text-gray-500">Penny</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-purple-400 font-semibold">{entry.cryptoPoints.toFixed(0)}</div>
-                  <div className="text-xs text-gray-500">Crypto</div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
-
-      {/* Category Links */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <h2 className="text-2xl font-bold text-center mb-8">Explore Markets</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          <Link href="/hot-picks" className="group">
-            <div className="bg-gradient-to-br from-green-900/20 to-green-950/50 border border-green-500/20 rounded-2xl p-6 hover:border-green-500/40 transition-all">
-              <TrendingUp className="w-12 h-12 text-green-400 mb-4" />
-              <h3 className="text-xl font-bold mb-2 group-hover:text-green-400 transition-colors">Hot Stocks</h3>
-              <p className="text-gray-400 text-sm">Blue chip and mid-cap stock picks from our AI models.</p>
-              <div className="mt-4 text-green-400 text-sm flex items-center gap-1">
-                View Picks <ArrowUpRight className="w-4 h-4" />
-              </div>
-            </div>
-          </Link>
-          
-          <Link href="/penny-stocks" className="group">
-            <div className="bg-gradient-to-br from-yellow-900/20 to-yellow-950/50 border border-yellow-500/20 rounded-2xl p-6 hover:border-yellow-500/40 transition-all">
-              <Zap className="w-12 h-12 text-yellow-400 mb-4" />
-              <h3 className="text-xl font-bold mb-2 group-hover:text-yellow-400 transition-colors">Penny Stocks</h3>
-              <p className="text-gray-400 text-sm">High-risk, high-reward penny stock picks under $5.</p>
-              <div className="mt-4 text-yellow-400 text-sm flex items-center gap-1">
-                View Picks <ArrowUpRight className="w-4 h-4" />
-              </div>
-            </div>
-          </Link>
-          
-          <Link href="/crypto" className="group">
-            <div className="bg-gradient-to-br from-purple-900/20 to-purple-950/50 border border-purple-500/20 rounded-2xl p-6 hover:border-purple-500/40 transition-all">
-              <Bitcoin className="w-12 h-12 text-purple-400 mb-4" />
-              <h3 className="text-xl font-bold mb-2 group-hover:text-purple-400 transition-colors">Crypto</h3>
-              <p className="text-gray-400 text-sm">AI-powered cryptocurrency predictions and analysis.</p>
-              <div className="mt-4 text-purple-400 text-sm flex items-center gap-1">
-                View Picks <ArrowUpRight className="w-4 h-4" />
-              </div>
-            </div>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LeaderboardCard({ 
-  entry, 
-  rank, 
-  category,
-  stockStats,
-  pennyStats,
-  cryptoStats,
-  featured 
-}: { 
-  entry: CompetitionLeaderboard; 
-  rank: number;
-  category: string;
-  stockStats: AIStatistics[];
-  pennyStats: AIStatistics[];
-  cryptoStats: AIStatistics[];
-  featured?: boolean;
-}) {
-  const getStats = () => {
-    switch (category) {
-      case 'stocks': return stockStats.find(s => s.aiModelId === entry.aiModelId);
-      case 'penny': return pennyStats.find(s => s.aiModelId === entry.aiModelId);
-      case 'crypto': return cryptoStats.find(s => s.aiModelId === entry.aiModelId);
-      default: return null;
-    }
-  };
-  
-  const categoryStats = getStats();
-  
-  const getRankGradient = () => {
-    switch (rank) {
-      case 1: return 'from-yellow-500 to-amber-600';
-      case 2: return 'from-gray-300 to-gray-500';
-      case 3: return 'from-amber-600 to-amber-800';
-      default: return 'from-gray-600 to-gray-800';
-    }
-  };
-
-  return (
-    <div className={`w-full bg-gray-900/50 backdrop-blur border rounded-2xl p-6 ${
-      rank === 1 ? 'border-yellow-500/50 ring-2 ring-yellow-500/20' :
-      rank === 2 ? 'border-gray-400/50' :
-      'border-amber-600/50'
-    } ${featured ? 'transform scale-105' : ''}`}>
-      {/* Rank Badge */}
-      <div className={`mx-auto w-14 h-14 rounded-full bg-gradient-to-br ${getRankGradient()} flex items-center justify-center mb-4 ${featured ? 'ring-4 ring-yellow-500/30' : ''}`}>
-        {rank === 1 ? (
-          <Crown className="w-7 h-7 text-white" />
         ) : (
-          <span className="text-2xl font-bold text-white">{rank}</span>
+          <div className={`bg-gray-800/50 border ${TIERS[selectedTier].borderColor} rounded-2xl overflow-hidden`}>
+            <div className={`bg-gradient-to-r ${TIERS[selectedTier].bgGradient} p-6 border-b ${TIERS[selectedTier].borderColor}`}>
+              <div className="flex items-center gap-4">
+                <span className="text-5xl">{TIERS[selectedTier].icon}</span>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{TIERS[selectedTier].name}</h2>
+                  <p className="text-gray-400">{TIERS[selectedTier].description}</p>
+                </div>
+              </div>
+            </div>
+            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gray-900/50 text-sm font-medium text-gray-500 border-b border-gray-700/50">
+              <div className="col-span-1">Rank</div>
+              <div className="col-span-3">AI Model</div>
+              <div className="col-span-2 text-right">Points</div>
+              <div className="col-span-2 text-right">Win Rate</div>
+              <div className="col-span-1 text-right">W/L</div>
+              <div className="col-span-1 text-right">Streak</div>
+              <div className="col-span-1 text-right">Return</div>
+              <div className="col-span-1 text-center">Trend</div>
+            </div>
+            <div className="divide-y divide-gray-700/50">
+              {AI_COMPETITORS[selectedTier].map((ai) => (
+                <Link 
+                  key={ai.id} 
+                  href={`/ai/${ai.id}`}
+                  className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-700/30 transition items-center"
+                >
+                  <div className="col-span-1">{getRankBadge(ai.rank)}</div>
+                  <div className="col-span-3 flex items-center gap-3">
+                    <span className="text-2xl">{ai.avatar}</span>
+                    <div>
+                      <div className="font-medium text-white">{ai.name}</div>
+                      <div className="text-sm text-gray-500">{ai.provider}</div>
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-right font-bold text-white">{ai.points.toLocaleString()}</div>
+                  <div className="col-span-2 text-right">
+                    <span className={`font-medium ${ai.winRate >= 70 ? 'text-emerald-400' : ai.winRate >= 60 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                      {ai.winRate}%
+                    </span>
+                  </div>
+                  <div className="col-span-1 text-right text-sm">
+                    <span className="text-emerald-400">{ai.wins}</span>/<span className="text-red-400">{ai.losses}</span>
+                  </div>
+                  <div className="col-span-1 text-right">{getStreakDisplay(ai.streak)}</div>
+                  <div className="col-span-1 text-right">
+                    <span className={ai.avgReturn > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                      {ai.avgReturn > 0 ? '+' : ''}{ai.avgReturn}%
+                    </span>
+                  </div>
+                  <div className="col-span-1 flex justify-center">{getRankChangeIcon(ai.rank, ai.prevRank)}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
         )}
+
+        {/* Championship Schedule */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Crown className="w-6 h-6 text-yellow-400" />
+            Championship Schedule
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <Trophy className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">Quarterly Championships</h3>
+                  <p className="text-sm text-gray-500">Within each tier</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => (
+                  <div key={q} className={`flex items-center justify-between p-3 rounded-lg ${q === currentQuarter ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-gray-700/30'}`}>
+                    <span className={q === currentQuarter ? 'text-blue-400 font-medium' : 'text-gray-400'}>{q} {currentYear}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full ${i < 3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                      {i < 3 ? 'Complete' : 'Active'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-gray-800/50 border border-purple-500/30 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <Swords className="w-6 h-6 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">Champions Challenge</h3>
+                  <p className="text-sm text-gray-500">Tier winners compete</p>
+                </div>
+              </div>
+              <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                <div className="text-sm text-gray-400 mb-2">Next Challenge</div>
+                <div className="text-lg font-bold text-white">January 2026</div>
+                <p className="text-sm text-gray-500 mt-2">Q4 tier winners will face off</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-800/50 border border-yellow-500/30 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+                  <Crown className="w-6 h-6 text-yellow-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">Final Faceoff</h3>
+                  <p className="text-sm text-gray-500">Annual grand championship</p>
+                </div>
+              </div>
+              <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                <div className="text-sm text-gray-400 mb-2">Grand Championship</div>
+                <div className="text-lg font-bold text-white">February 2026</div>
+                <p className="text-sm text-gray-500 mt-2">All Champions Challenge winners compete</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* How Scoring Works */}
+        <div className="mt-12 bg-gray-800/50 border border-gray-700 rounded-2xl p-8">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Target className="w-6 h-6 text-cyan-400" />
+            How Scoring Works
+          </h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+              <div className="text-2xl font-bold text-emerald-400 mb-2">+10</div>
+              <div className="text-white font-medium">Correct Direction</div>
+              <p className="text-sm text-gray-500 mt-1">Predicted UP/DOWN correctly</p>
+            </div>
+            <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
+              <div className="text-2xl font-bold text-cyan-400 mb-2">+25</div>
+              <div className="text-white font-medium">Hit Target Price</div>
+              <p className="text-sm text-gray-500 mt-1">Price reached target</p>
+            </div>
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+              <div className="text-2xl font-bold text-purple-400 mb-2">+5</div>
+              <div className="text-white font-medium">Beat Market</div>
+              <p className="text-sm text-gray-500 mt-1">Outperformed S&P 500</p>
+            </div>
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="text-2xl font-bold text-red-400 mb-2">-15</div>
+              <div className="text-white font-medium">Hit Stop Loss</div>
+              <p className="text-sm text-gray-500 mt-1">Triggered stop loss level</p>
+            </div>
+          </div>
+          <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <div className="flex items-center gap-3">
+              <Flame className="w-6 h-6 text-amber-400" />
+              <div>
+                <div className="text-white font-medium">Win Streak Bonuses</div>
+                <p className="text-sm text-gray-400">3 wins: +5 • 5 wins: +15 • 10 wins: +50 • 20 wins: +200</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Award className="w-6 h-6 text-emerald-400" />
+            Recent Achievements
+          </h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { ai: 'Claude Sage', achievement: 'Win Streak 10', icon: '🔥', time: '2 hours ago' },
+              { ai: 'Javari Prime', achievement: 'Perfect Week', icon: '⭐', time: '1 day ago' },
+              { ai: 'GPT Swift', achievement: 'Promoted to Medium', icon: '📈', time: '3 days ago' },
+              { ai: 'Llama Speedster', achievement: 'Upset Victory', icon: '⚔️', time: '5 days ago' },
+            ].map((item, i) => (
+              <div key={i} className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 flex items-center gap-4">
+                <span className="text-3xl">{item.icon}</span>
+                <div>
+                  <div className="font-medium text-white">{item.ai}</div>
+                  <div className="text-sm text-cyan-400">{item.achievement}</div>
+                  <div className="text-xs text-gray-500">{item.time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      
-      {/* AI Info */}
-      <div 
-        className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center font-bold text-2xl mb-3"
-        style={{ backgroundColor: entry.color + '20', color: entry.color }}
-      >
-        {entry.displayName.slice(0, 2)}
-      </div>
-      <h3 className="text-xl font-bold text-center mb-2">{entry.displayName}</h3>
-      
-      {/* Points */}
-      <div className="text-center mb-4">
-        <div className="text-3xl font-bold text-cyan-400">
-          {category === 'overall' ? entry.totalPoints.toFixed(0) :
-           category === 'stocks' ? entry.stockPoints.toFixed(0) :
-           category === 'penny' ? entry.pennyStockPoints.toFixed(0) :
-           entry.cryptoPoints.toFixed(0)}
-        </div>
-        <div className="text-sm text-gray-400">points</div>
-      </div>
-      
-      {/* Category Stats */}
-      {categoryStats ? (
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Win Rate</span>
-            <span className={categoryStats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}>
-              {categoryStats.winRate.toFixed(1)}%
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Avg Return</span>
-            <span className={categoryStats.avgReturn >= 0 ? 'text-green-400' : 'text-red-400'}>
-              {categoryStats.avgReturn >= 0 ? '+' : ''}{categoryStats.avgReturn.toFixed(1)}%
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Total Picks</span>
-            <span>{categoryStats.totalPicks}</span>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <div className="text-center">
-            <div className="text-green-400 font-semibold">{entry.stockPoints.toFixed(0)}</div>
-            <div className="text-gray-500">Stocks</div>
-          </div>
-          <div className="text-center">
-            <div className="text-yellow-400 font-semibold">{entry.pennyStockPoints.toFixed(0)}</div>
-            <div className="text-gray-500">Penny</div>
-          </div>
-          <div className="text-center">
-            <div className="text-purple-400 font-semibold">{entry.cryptoPoints.toFixed(0)}</div>
-            <div className="text-gray-500">Crypto</div>
-          </div>
-        </div>
-      )}
-      
-      {/* Streak */}
-      {entry.streak > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-700/50 flex items-center justify-center gap-2">
-          <Flame className="w-4 h-4 text-orange-400" />
-          <span className="text-sm text-orange-400">{entry.streak} win streak</span>
-        </div>
-      )}
     </div>
   );
 }
