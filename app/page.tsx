@@ -198,7 +198,7 @@ export default function LandingPage() {
               </div>
             </Link>
             <div className="flex items-center gap-4">
-              <Link href="/dashboard" className="text-gray-400 hover:text-white transition">
+              <Link href="/ai-picks" className="text-gray-400 hover:text-white transition">
                 Dashboard
               </Link>
               <Link 
