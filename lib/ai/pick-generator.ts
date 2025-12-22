@@ -807,5 +807,4 @@ export async function generateAllAIPicks(
 // EXPORTS FOR COMPETITION SYSTEM
 // ============================================================================
 
-export { AI_MODELS, AI_PROVIDERS, AI_TIERS } from '../types/ai-models';
-export type { AIModelId, AITier, AIProvider } from '../types/ai-models';
+export { getModelsByTier, getEnabledModels };
