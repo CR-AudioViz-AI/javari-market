@@ -1,13 +1,12 @@
 // lib/ai/pick-generator.ts
-// Market Oracle Ultimate - Enhanced AI Pick Generator
-// Updated: December 21, 2025 - 22 AI Models, 3 Tiers, 11 Providers
+// Market Oracle Ultimate - AI Pick Generator with Google AI SDK
+// Updated: December 14, 2025 - Use official Google AI SDK for Gemini
 
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { AIPick, PickDirection, ConsensusAssessment } from '../types/learning';
+import type { AIModelName, AIPick, PickDirection, ConsensusAssessment } from '../types/learning';
 import { getLatestCalibration } from '../learning/calibration-engine';
 import { buildJavariConsensus } from '../learning/javari-consensus';
-import { AI_MODELS, AI_PROVIDERS, type AIModelId, type AITier } from '../types/ai-models';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,9 +18,13 @@ const genAI = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
 
-// ============================================================================
-// MARKET DATA
-// ============================================================================
+// AI Configuration
+const AI_CONFIGS: Record<string, { model: string; enabled: boolean; name: string }> = {
+  gpt4: { model: 'gpt-4-turbo-preview', enabled: true, name: 'GPT-4' },
+  claude: { model: 'claude-3-sonnet-20240229', enabled: true, name: 'Claude' },
+  gemini: { model: 'gemini-pro-latest', enabled: true, name: 'Gemini' },
+  perplexity: { model: 'sonar', enabled: true, name: 'Perplexity' },
+};
 
 interface MarketData {
   symbol: string;
@@ -71,467 +74,112 @@ async function getMarketData(symbol: string): Promise<MarketData | null> {
   }
 }
 
-// ============================================================================
-// PROMPT BUILDING
-// ============================================================================
-
-function buildPrompt(
-  m: MarketData, 
-  modelId: AIModelId,
-  cal: { bestSectors: string[]; worstSectors: string[]; adjustments: string[] } | null
-): string {
-  const modelConfig = AI_MODELS[modelId];
-  const personality = modelConfig?.personality || 'analytical and thorough';
-  const style = modelConfig?.tradingStyle || 'balanced';
-  
-  const base = `You are ${modelConfig?.displayName || modelId}, an AI stock analyst with personality: "${personality}". Trading style: ${style}.
-
-Analyze ${m.symbol} (${m.companyName}).
-Current Price: $${m.currentPrice.toFixed(2)}
-24h Change: ${m.changePercent24h.toFixed(2)}%
-Sector: ${m.sector}
-Market Cap: $${(m.marketCap/1e9).toFixed(2)}B
-P/E Ratio: ${m.peRatio || 'N/A'}
-52-Week Range: $${m.low52Week.toFixed(2)} - $${m.high52Week.toFixed(2)}
-SMA 50: ${m.sma50 ? '$' + m.sma50.toFixed(2) : 'N/A'}
-SMA 200: ${m.sma200 ? '$' + m.sma200.toFixed(2) : 'N/A'}`;
-
-  const calInfo = cal ? `\nHistorical calibration: Best performing sectors: ${cal.bestSectors.join(', ')}.` : '';
-  
-  const format = `
-
-Respond with ONLY valid JSON (no markdown, no code blocks):
-{
-  "direction": "UP" | "DOWN" | "HOLD",
-  "confidence": 0-100,
-  "thesis": "2-3 sentence summary",
-  "full_reasoning": "detailed analysis",
-  "target_price": number,
-  "stop_loss": number,
-  "timeframe": "1W" | "2W" | "1M",
-  "factor_assessments": [
-    {"factorId": "pe_ratio", "factorName": "P/E Ratio", "value": "string", "interpretation": "BULLISH" | "BEARISH" | "NEUTRAL", "confidence": 0-100, "reasoning": "why"}
-  ],
-  "key_bullish_factors": ["factor1", "factor2"],
-  "key_bearish_factors": ["factor1", "factor2"],
-  "risks": ["risk1", "risk2"],
-  "catalysts": ["catalyst1", "catalyst2"]
-}`;
-
+function buildPrompt(m: MarketData, cal: { bestSectors: string[]; worstSectors: string[]; adjustments: string[] } | null): string {
+  const base = `Analyze ${m.symbol} (${m.companyName}). Price: $${m.currentPrice.toFixed(2)}, Change: ${m.changePercent24h.toFixed(2)}%, Sector: ${m.sector}, MCap: $${(m.marketCap/1e9).toFixed(2)}B, PE: ${m.peRatio||'N/A'}, 52W: $${m.low52Week.toFixed(2)}-$${m.high52Week.toFixed(2)}, SMA50: ${m.sma50?'$'+m.sma50.toFixed(2):'N/A'}, SMA200: ${m.sma200?'$'+m.sma200.toFixed(2):'N/A'}.`;
+  const calInfo = cal ? ` Best sectors: ${cal.bestSectors.join(',')}.` : '';
+  const format = ` Respond JSON ONLY: {"direction":"UP"|"DOWN"|"HOLD","confidence":0-100,"thesis":"text","full_reasoning":"text","target_price":number,"stop_loss":number,"timeframe":"1W"|"2W"|"1M","factor_assessments":[{"factorId":"pe_ratio","factorName":"P/E","value":"v","interpretation":"BULLISH"|"BEARISH"|"NEUTRAL","confidence":0-100,"reasoning":"why"}],"key_bullish_factors":["f"],"key_bearish_factors":["f"],"risks":["r"],"catalysts":["c"]}`;
   return base + calInfo + format;
 }
 
-// ============================================================================
-// AI API CALLS - By Provider
-// ============================================================================
-
-// OpenAI (GPT models)
-async function callOpenAI(prompt: string, modelString: string): Promise<string | null> {
+async function callGPT4(prompt: string): Promise<string | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        messages: [{ role: 'user', content: prompt }], 
-        max_tokens: 2000, 
-        temperature: 0.3,
-        response_format: { type: 'json_object' }
-      }),
+      body: JSON.stringify({ model: 'gpt-4-turbo-preview', messages: [{ role: 'user', content: prompt }], max_tokens: 2000, temperature: 0.3 }),
     });
-    if (!r.ok) {
-      console.error(`OpenAI ${modelString} error:`, r.status);
-      return null;
-    }
+    if (!r.ok) return null;
     const d = await r.json();
     return d.choices?.[0]?.message?.content || null;
-  } catch (e) { 
-    console.error(`OpenAI ${modelString} exception:`, e);
-    return null; 
-  }
+  } catch { return null; }
 }
 
-// Anthropic (Claude models)
-async function callAnthropic(prompt: string, modelString: string): Promise<string | null> {
+async function callClaude(prompt: string): Promise<string | null> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        'x-api-key': key, 
-        'anthropic-version': '2023-06-01' 
-      },
-      body: JSON.stringify({ 
-        model: modelString, 
-        max_tokens: 2000, 
-        messages: [{ role: 'user', content: prompt }] 
-      }),
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-3-sonnet-20240229', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
     });
     const d = await r.json();
-    if (d.error) {
-      console.error(`Anthropic ${modelString} error:`, d.error);
-      return null;
-    }
+    if (d.error) return null;
     return d.content?.[0]?.text || null;
-  } catch (e) { 
-    console.error(`Anthropic ${modelString} exception:`, e);
-    return null; 
-  }
+  } catch { return null; }
 }
 
-// Google (Gemini models)
-async function callGoogle(prompt: string, modelString: string): Promise<string | null> {
+async function callGemini(prompt: string): Promise<string | null> {
   if (!genAI) {
     console.log('Gemini: No API key configured');
     return null;
   }
   try {
-    const model = genAI.getGenerativeModel({ model: modelString });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro-latest' });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
+    console.log('Gemini response received:', text?.substring(0, 100));
     return text || null;
   } catch (err) {
-    console.error(`Gemini ${modelString} error:`, err);
+    console.error('Gemini SDK error:', err);
     return null;
   }
 }
 
-// Perplexity (Sonar models)
-async function callPerplexity(prompt: string, modelString: string): Promise<string | null> {
+async function callPerplexity(prompt: string): Promise<string | null> {
   const key = process.env.PERPLEXITY_API_KEY;
   if (!key) return null;
   try {
     const r = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        messages: [{ role: 'user', content: prompt }], 
-        max_tokens: 2000, 
-        temperature: 0.3 
-      }),
+      body: JSON.stringify({ model: 'sonar', messages: [{ role: 'user', content: prompt }], max_tokens: 2000, temperature: 0.3 }),
     });
-    if (!r.ok) {
-      console.error(`Perplexity ${modelString} error:`, r.status);
-      return null;
-    }
+    if (!r.ok) return null;
     const d = await r.json();
     return d.choices?.[0]?.message?.content || null;
-  } catch (e) { 
-    console.error(`Perplexity ${modelString} exception:`, e);
-    return null; 
-  }
+  } catch { return null; }
 }
 
-// Groq (Fast inference)
-async function callGroq(prompt: string, modelString: string): Promise<string | null> {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
+function parsePick(res: string, ai: AIModelName, m: MarketData): AIPick | null {
   try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        messages: [{ role: 'user', content: prompt }], 
-        max_tokens: 2000, 
-        temperature: 0.3 
-      }),
-    });
-    if (!r.ok) {
-      console.error(`Groq ${modelString} error:`, r.status);
-      return null;
-    }
-    const d = await r.json();
-    return d.choices?.[0]?.message?.content || null;
-  } catch (e) { 
-    console.error(`Groq ${modelString} exception:`, e);
-    return null; 
-  }
-}
-
-// Mistral
-async function callMistral(prompt: string, modelString: string): Promise<string | null> {
-  const key = process.env.MISTRAL_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        messages: [{ role: 'user', content: prompt }], 
-        max_tokens: 2000, 
-        temperature: 0.3 
-      }),
-    });
-    if (!r.ok) {
-      console.error(`Mistral ${modelString} error:`, r.status);
-      return null;
-    }
-    const d = await r.json();
-    return d.choices?.[0]?.message?.content || null;
-  } catch (e) { 
-    console.error(`Mistral ${modelString} exception:`, e);
-    return null; 
-  }
-}
-
-// xAI (Grok)
-async function callXAI(prompt: string, modelString: string): Promise<string | null> {
-  const key = process.env.XAI_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        messages: [{ role: 'user', content: prompt }], 
-        max_tokens: 2000, 
-        temperature: 0.3 
-      }),
-    });
-    if (!r.ok) {
-      console.error(`xAI ${modelString} error:`, r.status);
-      return null;
-    }
-    const d = await r.json();
-    return d.choices?.[0]?.message?.content || null;
-  } catch (e) { 
-    console.error(`xAI ${modelString} exception:`, e);
-    return null; 
-  }
-}
-
-// Cohere
-async function callCohere(prompt: string, modelString: string): Promise<string | null> {
-  const key = process.env.COHERE_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.cohere.ai/v1/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        message: prompt,
-        temperature: 0.3 
-      }),
-    });
-    if (!r.ok) {
-      console.error(`Cohere ${modelString} error:`, r.status);
-      return null;
-    }
-    const d = await r.json();
-    return d.text || null;
-  } catch (e) { 
-    console.error(`Cohere ${modelString} exception:`, e);
-    return null; 
-  }
-}
-
-// Together AI
-async function callTogether(prompt: string, modelString: string): Promise<string | null> {
-  const key = process.env.TOGETHER_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.together.xyz/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        messages: [{ role: 'user', content: prompt }], 
-        max_tokens: 2000, 
-        temperature: 0.3 
-      }),
-    });
-    if (!r.ok) {
-      console.error(`Together ${modelString} error:`, r.status);
-      return null;
-    }
-    const d = await r.json();
-    return d.choices?.[0]?.message?.content || null;
-  } catch (e) { 
-    console.error(`Together ${modelString} exception:`, e);
-    return null; 
-  }
-}
-
-// Fireworks AI
-async function callFireworks(prompt: string, modelString: string): Promise<string | null> {
-  const key = process.env.FIREWORKS_API_KEY;
-  if (!key) return null;
-  try {
-    const r = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ 
-        model: modelString, 
-        messages: [{ role: 'user', content: prompt }], 
-        max_tokens: 2000, 
-        temperature: 0.3 
-      }),
-    });
-    if (!r.ok) {
-      console.error(`Fireworks ${modelString} error:`, r.status);
-      return null;
-    }
-    const d = await r.json();
-    return d.choices?.[0]?.message?.content || null;
-  } catch (e) { 
-    console.error(`Fireworks ${modelString} exception:`, e);
-    return null; 
-  }
-}
-
-// ============================================================================
-// UNIFIED AI CALLER
-// ============================================================================
-
-async function callAI(modelId: AIModelId, prompt: string): Promise<string | null> {
-  const modelConfig = AI_MODELS[modelId];
-  if (!modelConfig || !modelConfig.enabled) {
-    console.log(`Model ${modelId} is disabled or not found`);
-    return null;
-  }
-  
-  const providerConfig = AI_PROVIDERS[modelConfig.provider];
-  if (!providerConfig || !providerConfig.enabled) {
-    console.log(`Provider ${modelConfig.provider} is disabled or not found`);
-    return null;
-  }
-  
-  const modelString = modelConfig.modelString;
-  
-  switch (modelConfig.provider) {
-    case 'openai':
-      return callOpenAI(prompt, modelString);
-    case 'anthropic':
-      return callAnthropic(prompt, modelString);
-    case 'google':
-      return callGoogle(prompt, modelString);
-    case 'perplexity':
-      return callPerplexity(prompt, modelString);
-    case 'groq':
-      return callGroq(prompt, modelString);
-    case 'mistral':
-      return callMistral(prompt, modelString);
-    case 'xai':
-      return callXAI(prompt, modelString);
-    case 'cohere':
-      return callCohere(prompt, modelString);
-    case 'together':
-      return callTogether(prompt, modelString);
-    case 'fireworks':
-      return callFireworks(prompt, modelString);
-    default:
-      console.log(`Unknown provider: ${modelConfig.provider}`);
-      return null;
-  }
-}
-
-// ============================================================================
-// RESPONSE PARSING
-// ============================================================================
-
-function parsePick(res: string, modelId: AIModelId, m: MarketData): AIPick | null {
-  try {
-    // Clean up response
-    const c = res.trim()
-      .replace(/^```json\s*/g, '')
-      .replace(/\s*```$/g, '')
-      .replace(/^```\s*/g, '');
-    
+    const c = res.trim().replace(/^```json\s*/g, '').replace(/\s*```$/g, '').replace(/^```\s*/g, '');
     const p = JSON.parse(c);
     const now = new Date();
     const exp = new Date(now);
     const tf = p.timeframe || '1W';
     exp.setDate(exp.getDate() + (tf === '2W' ? 14 : tf === '1M' ? 30 : 7));
-    
-    const modelConfig = AI_MODELS[modelId];
-    
     return {
-      id: crypto.randomUUID(),
-      aiModel: modelId,
-      symbol: m.symbol,
-      companyName: m.companyName,
-      sector: m.sector,
-      direction: p.direction as PickDirection,
-      confidence: Math.min(100, Math.max(0, p.confidence)),
-      timeframe: tf,
-      entryPrice: m.currentPrice,
-      targetPrice: p.target_price,
-      stopLoss: p.stop_loss,
-      thesis: p.thesis,
-      fullReasoning: p.full_reasoning,
-      factorAssessments: p.factor_assessments || [],
-      keyBullishFactors: p.key_bullish_factors || [],
-      keyBearishFactors: p.key_bearish_factors || [],
-      risks: p.risks || [],
-      catalysts: p.catalysts || [],
-      createdAt: now,
-      expiresAt: exp,
-      status: 'PENDING',
-      // New fields for tiered system
-      tier: modelConfig?.tier,
-      displayName: modelConfig?.displayName,
-      avatar: modelConfig?.avatar,
+      id: crypto.randomUUID(), aiModel: ai, symbol: m.symbol, companyName: m.companyName, sector: m.sector,
+      direction: p.direction as PickDirection, confidence: p.confidence, timeframe: tf,
+      entryPrice: m.currentPrice, targetPrice: p.target_price, stopLoss: p.stop_loss,
+      thesis: p.thesis, fullReasoning: p.full_reasoning, factorAssessments: p.factor_assessments || [],
+      keyBullishFactors: p.key_bullish_factors || [], keyBearishFactors: p.key_bearish_factors || [],
+      risks: p.risks || [], catalysts: p.catalysts || [], createdAt: now, expiresAt: exp, status: 'PENDING',
     };
-  } catch (e) { 
-    console.error(`Parse error for ${modelId}:`, e);
-    return null; 
-  }
+  } catch { return null; }
 }
-
-// ============================================================================
-// DATABASE OPERATIONS
-// ============================================================================
 
 function toDb(p: AIPick): Record<string, unknown> {
   return {
-    id: p.id,
-    ai_model: p.aiModel,
-    symbol: p.symbol,
-    company_name: p.companyName,
-    sector: p.sector,
-    direction: p.direction,
-    confidence: p.confidence,
-    timeframe: p.timeframe,
-    entry_price: p.entryPrice,
-    target_price: p.targetPrice,
-    stop_loss: p.stopLoss,
-    thesis: p.thesis,
-    full_reasoning: p.fullReasoning,
-    factor_assessments: p.factorAssessments,
-    key_bullish_factors: p.keyBullishFactors,
-    key_bearish_factors: p.keyBearishFactors,
-    risks: p.risks,
-    catalysts: p.catalysts,
-    created_at: p.createdAt.toISOString(),
-    expires_at: p.expiresAt.toISOString(),
-    status: p.status,
-    tier: p.tier,
-    display_name: p.displayName,
+    id: p.id, ai_model: p.aiModel, symbol: p.symbol, company_name: p.companyName, sector: p.sector,
+    direction: p.direction, confidence: p.confidence, timeframe: p.timeframe,
+    entry_price: p.entryPrice, target_price: p.targetPrice, stop_loss: p.stopLoss,
+    thesis: p.thesis, full_reasoning: p.fullReasoning, factor_assessments: p.factorAssessments,
+    key_bullish_factors: p.keyBullishFactors, key_bearish_factors: p.keyBearishFactors,
+    risks: p.risks, catalysts: p.catalysts, created_at: p.createdAt.toISOString(),
+    expires_at: p.expiresAt.toISOString(), status: p.status,
   };
 }
 
 async function savePickToDb(pick: AIPick): Promise<boolean> {
   try {
     const { error } = await supabase.from('market_oracle_picks').insert(toDb(pick));
-    if (error) {
-      console.error('DB save error:', error);
-      return false;
-    }
-    return true;
-  } catch (e) { 
-    console.error('DB exception:', e);
-    return false; 
-  }
+    return !error;
+  } catch { return false; }
 }
 
 async function saveConsensusToDb(symbol: string, consensus: ConsensusAssessment): Promise<boolean> {
@@ -556,148 +204,34 @@ async function saveConsensusToDb(symbol: string, consensus: ConsensusAssessment)
   } catch { return false; }
 }
 
-// ============================================================================
-// GET MODELS BY TIER
-// ============================================================================
-
-export function getModelsByTier(tier: AITier): AIModelId[] {
-  return Object.entries(AI_MODELS)
-    .filter(([_, config]) => config.tier === tier && config.enabled)
-    .map(([id]) => id as AIModelId);
-}
-
-export function getEnabledModels(): AIModelId[] {
-  return Object.entries(AI_MODELS)
-    .filter(([_, config]) => config.enabled && config.tier !== 'javari')
-    .map(([id]) => id as AIModelId);
-}
-
-// Legacy mapping for backward compatibility
-const LEGACY_MODEL_MAP: Record<string, AIModelId> = {
-  'gpt4': 'gpt-4-turbo',
-  'claude': 'claude-3-sonnet',
-  'gemini': 'gemini-pro',
-  'perplexity': 'sonar-medium',
-};
-
-// ============================================================================
-// SINGLE AI PICK GENERATION
-// ============================================================================
-
-export async function generatePickFromAI(
-  modelId: AIModelId | string, 
-  symbol: string
-): Promise<AIPick | null> {
-  // Handle legacy model names
-  const resolvedModelId = LEGACY_MODEL_MAP[modelId] || modelId as AIModelId;
+// Generate pick from a single AI
+export async function generatePickFromAI(ai: Exclude<AIModelName, 'javari'>, sym: string): Promise<AIPick | null> {
+  if (!AI_CONFIGS[ai]?.enabled) return null;
   
-  const modelConfig = AI_MODELS[resolvedModelId];
-  if (!modelConfig || !modelConfig.enabled) {
-    console.log(`Model ${resolvedModelId} is not available`);
-    return null;
+  const m = await getMarketData(sym);
+  if (!m) return null;
+  
+  const cal = await getLatestCalibration(ai);
+  const prompt = buildPrompt(m, cal);
+  
+  let res: string | null = null;
+  switch (ai) {
+    case 'gpt4': res = await callGPT4(prompt); break;
+    case 'claude': res = await callClaude(prompt); break;
+    case 'gemini': res = await callGemini(prompt); break;
+    case 'perplexity': res = await callPerplexity(prompt); break;
   }
   
-  const m = await getMarketData(symbol);
-  if (!m) {
-    console.log(`No market data for ${symbol}`);
-    return null;
-  }
-  
-  const cal = await getLatestCalibration(resolvedModelId);
-  const prompt = buildPrompt(m, resolvedModelId, cal);
-  
-  const res = await callAI(resolvedModelId, prompt);
-  if (!res) {
-    console.log(`No response from ${resolvedModelId}`);
-    return null;
-  }
-  
-  const pick = parsePick(res, resolvedModelId, m);
-  if (!pick) {
-    console.log(`Failed to parse response from ${resolvedModelId}`);
-    return null;
-  }
+  if (!res) return null;
+  const pick = parsePick(res, ai, m);
+  if (!pick) return null;
   
   await savePickToDb(pick);
   return pick;
 }
 
-// ============================================================================
-// TIER-BASED PICK GENERATION
-// ============================================================================
-
-export async function generatePicksForTier(
-  tier: AITier,
-  symbol: string
-): Promise<{
-  picks: AIPick[];
-  aiStatus: Record<string, string>;
-  dbErrors: string[];
-}> {
-  const aiStatus: Record<string, string> = {};
-  const dbErrors: string[] = [];
-  
-  const m = await getMarketData(symbol);
-  if (!m) {
-    return { picks: [], aiStatus: {}, dbErrors: ['No market data'] };
-  }
-  
-  const modelIds = getModelsByTier(tier);
-  console.log(`Generating picks for ${tier} tier: ${modelIds.join(', ')}`);
-  
-  // Build prompts for each model
-  const promptPromises = modelIds.map(async modelId => {
-    const cal = await getLatestCalibration(modelId);
-    return { modelId, prompt: buildPrompt(m, modelId, cal) };
-  });
-  const prompts = await Promise.all(promptPromises);
-  
-  // Call all AIs in parallel
-  const aiCalls = prompts.map(async ({ modelId, prompt }) => {
-    const res = await callAI(modelId, prompt);
-    return { modelId, res };
-  });
-  
-  const results = await Promise.all(aiCalls);
-  
-  // Parse results
-  const picks: AIPick[] = [];
-  for (const { modelId, res } of results) {
-    if (!res) {
-      aiStatus[modelId] = 'failed';
-      continue;
-    }
-    
-    const pick = parsePick(res, modelId, m);
-    if (!pick) {
-      aiStatus[modelId] = 'parse_failed';
-      continue;
-    }
-    
-    const saved = await savePickToDb(pick);
-    if (!saved) {
-      dbErrors.push(`Failed to save ${modelId} pick`);
-    }
-    
-    picks.push(pick);
-    aiStatus[modelId] = 'success';
-  }
-  
-  return { picks, aiStatus, dbErrors };
-}
-
-// ============================================================================
-// ALL AI PICKS (Backward compatible + Enhanced)
-// ============================================================================
-
-export async function generateAllAIPicks(
-  symbol: string,
-  options?: {
-    tier?: AITier;           // Specific tier only
-    modelIds?: AIModelId[];  // Specific models only
-    maxModels?: number;      // Limit number of models
-  }
-): Promise<{ 
+// Generate picks from ALL AIs in parallel
+export async function generateAllAIPicks(symbol: string): Promise<{ 
   picks: AIPick[]; 
   consensus: ConsensusAssessment | null; 
   dbErrors: string[];
@@ -706,90 +240,70 @@ export async function generateAllAIPicks(
   const aiStatus: Record<string, string> = {};
   const dbErrors: string[] = [];
   
-  // Get market data first
+  // Get market data first (shared by all AIs)
   const m = await getMarketData(symbol);
   if (!m) {
     return { picks: [], consensus: null, dbErrors: ['No market data'], aiStatus: {} };
   }
   
-  // Determine which models to use
-  let modelIds: AIModelId[];
+  const aiModels: Array<Exclude<AIModelName, 'javari'>> = ['gpt4', 'claude', 'gemini', 'perplexity'];
+  const enabledAIs = aiModels.filter(ai => AI_CONFIGS[ai]?.enabled);
   
-  if (options?.modelIds) {
-    modelIds = options.modelIds;
-  } else if (options?.tier) {
-    modelIds = getModelsByTier(options.tier);
-  } else {
-    // Default: Use one model from each tier for balance
-    // Or use legacy 4 models for backward compatibility
-    modelIds = [
-      'gpt-4-turbo',      // Large tier
-      'claude-3-sonnet',  // Medium tier
-      'gemini-pro',       // Medium tier
-      'sonar-medium',     // Medium tier (Perplexity)
-    ].filter(id => AI_MODELS[id as AIModelId]?.enabled) as AIModelId[];
-  }
-  
-  if (options?.maxModels && modelIds.length > options.maxModels) {
-    modelIds = modelIds.slice(0, options.maxModels);
-  }
-  
-  console.log(`Generating picks for: ${modelIds.join(', ')}`);
-  
-  // Build prompts
-  const promptPromises = modelIds.map(async modelId => {
-    const cal = await getLatestCalibration(modelId);
-    return { modelId, prompt: buildPrompt(m, modelId, cal) };
+  // Build prompts (can use calibration data)
+  const promptPromises = enabledAIs.map(async ai => {
+    const cal = await getLatestCalibration(ai);
+    return { ai, prompt: buildPrompt(m, cal) };
   });
   const prompts = await Promise.all(promptPromises);
   
-  // Call all AIs in parallel
-  const aiCalls = prompts.map(async ({ modelId, prompt }) => {
-    const res = await callAI(modelId, prompt);
-    return { modelId, res };
+  // Call all AIs in PARALLEL
+  const aiCalls = prompts.map(async ({ ai, prompt }) => {
+    let res: string | null = null;
+    switch (ai) {
+      case 'gpt4': res = await callGPT4(prompt); break;
+      case 'claude': res = await callClaude(prompt); break;
+      case 'gemini': res = await callGemini(prompt); break;
+      case 'perplexity': res = await callPerplexity(prompt); break;
+    }
+    return { ai, res };
   });
   
   const results = await Promise.all(aiCalls);
   
-  // Parse and save results
+  // Parse results and save to DB
   const picks: AIPick[] = [];
-  for (const { modelId, res } of results) {
+  for (const { ai, res } of results) {
     if (!res) {
-      aiStatus[modelId] = 'failed';
+      aiStatus[ai] = 'failed';
       continue;
     }
     
-    const pick = parsePick(res, modelId, m);
+    const pick = parsePick(res, ai, m);
     if (!pick) {
-      aiStatus[modelId] = 'parse_failed';
+      aiStatus[ai] = 'parse_failed';
       continue;
     }
     
     const saved = await savePickToDb(pick);
     if (!saved) {
-      dbErrors.push(`Failed to save ${modelId} pick`);
+      dbErrors.push(`Failed to save ${ai} pick`);
     }
     
     picks.push(pick);
-    aiStatus[modelId] = 'success';
+    aiStatus[ai] = 'success';
   }
   
-  // Mark missing models
-  for (const modelId of modelIds) {
-    if (!aiStatus[modelId]) {
-      aiStatus[modelId] = 'not_called';
+  // Mark disabled AIs
+  for (const ai of aiModels) {
+    if (!enabledAIs.includes(ai)) {
+      aiStatus[ai] = 'disabled';
     }
   }
   
   // Build consensus if we have 2+ picks
   let consensus: ConsensusAssessment | null = null;
   if (picks.length >= 2) {
-    const fp = picks.map(p => ({ 
-      aiModel: p.aiModel, 
-      direction: p.direction, 
-      confidence: p.confidence, 
-      pickId: p.id 
-    }));
+    const fp = picks.map(p => ({ aiModel: p.aiModel, direction: p.direction, confidence: p.confidence, pickId: p.id }));
     consensus = await buildJavariConsensus(symbol, fp);
     
     if (consensus) {
@@ -803,8 +317,3 @@ export async function generateAllAIPicks(
   return { picks, consensus, dbErrors, aiStatus };
 }
 
-// ============================================================================
-// EXPORTS FOR COMPETITION SYSTEM
-// ============================================================================
-
-export { getModelsByTier, getEnabledModels };
