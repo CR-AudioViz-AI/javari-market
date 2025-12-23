@@ -56,7 +56,15 @@ async function fetchFinnhub<T>(endpoint: string, params: Record<string, string> 
   }
 }
 
-async function getFinnhubQuote(symbol: string) {
+interface IndexQuote {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+}
+
+async function getFinnhubQuote(symbol: string, name: string): Promise<IndexQuote | null> {
   const quote = await fetchFinnhub<{
     c: number; h: number; l: number; o: number; pc: number; d: number; dp: number;
   }>('/quote', { symbol });
@@ -64,13 +72,10 @@ async function getFinnhubQuote(symbol: string) {
   if (!quote || quote.c === 0) return null;
   return {
     symbol,
+    name,
     price: quote.c,
     change: quote.d,
     changePercent: quote.dp,
-    high: quote.h,
-    low: quote.l,
-    open: quote.o,
-    previousClose: quote.pc,
   };
 }
 
@@ -224,9 +229,9 @@ export async function GET(request: NextRequest) {
       fetchFredSeries('DGS10'),
       fetchFredSeries('DGS2'),
       fetchFredSeries('VIXCLS'),
-      getFinnhubQuote('SPY'),
-      getFinnhubQuote('QQQ'),
-      getFinnhubQuote('DIA'),
+      getFinnhubQuote('SPY', 'S&P 500 ETF'),
+      getFinnhubQuote('QQQ', 'Nasdaq 100 ETF'),
+      getFinnhubQuote('DIA', 'Dow Jones ETF'),
       getCryptoData(),
       getMarketNews(),
       getEarningsCalendar(),
@@ -250,16 +255,18 @@ export async function GET(request: NextRequest) {
       else vixLevel = 'EXTREME';
     }
 
+    // Build major indexes array - no spread needed now
+    const majorIndexes: IndexQuote[] = [];
+    if (spy) majorIndexes.push(spy);
+    if (qqq) majorIndexes.push(qqq);
+    if (dia) majorIndexes.push(dia);
+
     const response = {
       timestamp: new Date().toISOString(),
       markets: {
         stocks: {
           status: getMarketStatus(),
-          majorIndexes: [
-            spy ? { symbol: 'SPY', name: 'S&P 500 ETF', ...spy } : null,
-            qqq ? { symbol: 'QQQ', name: 'Nasdaq 100 ETF', ...qqq } : null,
-            dia ? { symbol: 'DIA', name: 'Dow Jones ETF', ...dia } : null,
-          ].filter((i): i is NonNullable<typeof i> => i !== null),
+          majorIndexes,
         },
         crypto: cryptoData,
       },
