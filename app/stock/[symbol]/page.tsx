@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -137,9 +137,8 @@ function getSentimentColor(sentiment: string): string {
 export default function StockIntelligencePage({ 
   params 
 }: { 
-  params: Promise<{ symbol: string }> 
+  params: { symbol: string } 
 }) {
-  const resolvedParams = use(params);
   const [data, setData] = useState<StockData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -163,8 +162,8 @@ export default function StockIntelligencePage({
   };
 
   useEffect(() => {
-    fetchData(resolvedParams.symbol);
-  }, [resolvedParams.symbol]);
+    fetchData(params.symbol);
+  }, [params.symbol]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
