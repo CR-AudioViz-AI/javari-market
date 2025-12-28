@@ -80,14 +80,15 @@ export default function MarketOraclePage() {
     }
   }, [])
 
+  const totalValue = portfolio.reduce((sum, p) => sum + p.totalValue, 0)
+  const totalGain = portfolio.reduce((sum, p) => sum + p.gain, 0)
+  const totalCost = portfolio.reduce((sum, p) => sum + (p.avgCost * p.shares), 0)
   const portfolioStats = {
-    totalValue: portfolio.reduce((sum, p) => sum + p.totalValue, 0),
-    totalGain: portfolio.reduce((sum, p) => sum + p.gain, 0),
-    totalCost: portfolio.reduce((sum, p) => sum + (p.avgCost * p.shares), 0),
+    totalValue,
+    totalGain,
+    totalCost,
+    totalGainPercent: totalCost > 0 ? ((totalGain / totalCost) * 100) : 0,
   }
-  portfolioStats.totalGainPercent = portfolioStats.totalCost > 0 
-    ? ((portfolioStats.totalGain / portfolioStats.totalCost) * 100) 
-    : 0
 
   const getSignalColor = (signal: string) => {
     const colors: Record<string, string> = {
