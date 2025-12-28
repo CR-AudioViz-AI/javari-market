@@ -32,7 +32,7 @@ export interface BatchSentimentResponse {
 }
 
 const XAI_API_URL = 'https://api.x.ai/v1/chat/completions'
-const MODEL = 'grok-4-0709' // Latest Grok with real-time X access
+const MODEL = 'grok-3' // Updated Dec 28, 2025 - grok-beta/grok-4 deprecated
 
 /**
  * Analyze Twitter/X sentiment for a single stock
