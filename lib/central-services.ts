@@ -1,433 +1,871 @@
 /**
- * CR AudioViz AI - Central Services Client v2.0
- * =============================================
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║                    CR AUDIOVIZ AI - CENTRAL SERVICES                         ║
+ * ║                          Version 3.0.0                                       ║
+ * ╠══════════════════════════════════════════════════════════════════════════════╣
+ * ║  This file MUST be included in every app in the ecosystem.                   ║
+ * ║  All apps route through craudiovizai.com/api for central services.           ║
+ * ║                                                                               ║
+ * ║  Services Provided:                                                           ║
+ * ║  - Authentication (OAuth, Email/Password, Session)                            ║
+ * ║  - Credits (Balance, Spend, Refund, History, Admin Bypass)                    ║
+ * ║  - Payments (Stripe, PayPal, Checkout)                                        ║
+ * ║  - Support (Tickets, Knowledge Base, Chat)                                    ║
+ * ║  - Enhancements (Feature Requests, Voting, Roadmap)                           ║
+ * ║  - Analytics (Events, Page Views, Conversions)                                ║
+ * ║  - Activity (Audit Trail, User Actions)                                       ║
+ * ║  - Notifications (Email, Push, In-App)                                        ║
+ * ║  - Registry (App Discovery, Health Reporting)                                 ║
+ * ║  - Cross-Selling (Recommendations)                                            ║
+ * ║                                                                               ║
+ * ║  NO app should have its own auth, payment, or credit endpoints.               ║
+ * ║  Everything goes through the central hub at craudiovizai.com                  ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
  * 
- * This file connects ALL apps to centralized services at craudiovizai.com
- * per the Henderson Standard. NO app should implement its own auth, payments,
- * credits, or other centralized services.
- * 
- * USAGE: Copy this file to your app's lib/ directory
- * 
- * @author CR AudioViz AI, LLC
- * @created December 31, 2025
- * @version 2.0 - Full API coverage
- * @standard Henderson Standard v1.1
+ * @version 3.0.0
+ * @date January 9, 2026
+ * @author CR AudioViz AI - Cindy & Roy Henderson
  */
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const CENTRAL_API = process.env.NEXT_PUBLIC_CENTRAL_API || 'https://craudiovizai.com/api';
-const JAVARI_API = process.env.NEXT_PUBLIC_JAVARI_API || 'https://javariai.com/api';
-const APP_ID = process.env.NEXT_PUBLIC_APP_ID || 'unknown-app';
+export const CENTRAL_DOMAIN = 'craudiovizai.com';
+export const CENTRAL_API_BASE = process.env.NEXT_PUBLIC_CENTRAL_API_URL || `https://${CENTRAL_DOMAIN}/api`;
 
-// Helper for API calls
-async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T & { error?: string }> {
+// ============================================================================
+// ADMIN BYPASS - Roy & Cindy Henderson get FREE access to EVERYTHING
+// ============================================================================
+
+export const ADMIN_EMAILS: string[] = [
+  'royhenderson@craudiovizai.com',
+  'cindyhenderson@craudiovizai.com',
+  'roy@craudiovizai.com',
+  'cindy@craudiovizai.com',
+  'admin@craudiovizai.com'
+];
+
+export function isAdmin(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
+export function shouldChargeCredits(email: string | null | undefined): boolean {
+  return !isAdmin(email);
+}
+
+// ============================================================================
+// CREDIT COSTS BY ACTION
+// ============================================================================
+
+export const CREDIT_COSTS: Record<string, number> = {
+  // AI Generation
+  'ai_image': 5,
+  'ai_video': 20,
+  'ai_audio': 10,
+  'ai_text': 1,
+  'ai_code': 2,
+  'ai_chat': 1,
+  
+  // Pattern Generation (Crochet, Knitting, Machine Knit)
+  'pattern_basic': 3,
+  'pattern_intermediate': 5,
+  'pattern_advanced': 10,
+  'pattern_custom': 15,
+  
+  // Documents
+  'pdf_generate': 3,
+  'pdf_merge': 2,
+  'pdf_convert': 2,
+  'ebook_generate': 10,
+  'ebook_convert': 5,
+  'invoice_generate': 2,
+  'presentation_generate': 5,
+  'resume_generate': 3,
+  'cover_letter_generate': 2,
+  'email_template_generate': 1,
+  'social_post_generate': 1,
+  
+  // Real Estate
+  'property_analysis': 5,
+  'market_report': 10,
+  'listing_generate': 3,
+  
+  // Games
+  'game_play': 0,  // Free
+  'game_premium_feature': 2,
+  
+  // Market/Trading
+  'stock_analysis': 3,
+  'crypto_analysis': 3,
+  'market_prediction': 5,
+  
+  // Travel
+  'itinerary_generate': 5,
+  'travel_recommendation': 2,
+  
+  // Misc
+  'export_data': 1,
+  'premium_feature': 2,
+  'api_call': 1
+};
+
+export function getCreditCost(action: string): number {
+  return CREDIT_COSTS[action] || 1;
+}
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface CentralResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+  code?: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  display_name?: string;
+  avatar_url?: string;
+  role: 'user' | 'admin' | 'super_admin';
+  credits: number;
+  plan: 'free' | 'pro' | 'business' | 'enterprise';
+  plan_expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreditBalance {
+  balance: number;
+  plan: string;
+  monthly_allowance: number;
+  used_this_month: number;
+  expires_at?: string;
+  auto_reload_enabled: boolean;
+  auto_reload_threshold?: number;
+  auto_reload_amount?: number;
+}
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  type: 'credit' | 'debit' | 'refund' | 'purchase' | 'bonus' | 'monthly_allowance';
+  action: string;
+  app_id: string;
+  description: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface Ticket {
+  id: string;
+  user_id: string;
+  subject: string;
+  description: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  app_id?: string;
+  assigned_to?: string;
+  messages: TicketMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketMessage {
+  id: string;
+  ticket_id: string;
+  user_id: string;
+  is_staff: boolean;
+  content: string;
+  attachments?: string[];
+  created_at: string;
+}
+
+export interface Enhancement {
+  id: string;
+  title: string;
+  description: string;
+  status: 'proposed' | 'under_review' | 'planned' | 'in_progress' | 'completed' | 'rejected';
+  category: string;
+  app_id?: string;
+  user_id: string;
+  votes: number;
+  has_voted?: boolean;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+  planned_release?: string;
+}
+
+export interface PaymentIntent {
+  id: string;
+  client_secret: string;
+  amount: number;
+  currency: string;
+  status: string;
+}
+
+// ============================================================================
+// CENTRAL FETCH UTILITY
+// ============================================================================
+
+async function centralFetch<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<CentralResponse<T>> {
   try {
-    const response = await fetch(`${CENTRAL_API}${endpoint}`, {
+    const url = endpoint.startsWith('http') ? endpoint : `${CENTRAL_API_BASE}${endpoint}`;
+    const res = await fetch(url, {
       ...options,
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
     });
-    return response.json();
-  } catch (error) {
-    return { error: String(error) } as T & { error?: string };
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      return {
+        success: false,
+        error: data.error || data.message || `HTTP ${res.status}`,
+        code: data.code
+      };
+    }
+    
+    return { success: true, data };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: message };
   }
 }
 
 // ============================================================================
-// AUTHENTICATION
+// AUTHENTICATION SERVICE
 // ============================================================================
 
-export const auth = {
-  signIn: (email: string, password: string) => 
-    apiCall('/auth/signin', { method: 'POST', body: JSON.stringify({ email, password, app_id: APP_ID }), credentials: 'include' }),
-  
-  signUp: (email: string, password: string, metadata?: any) =>
-    apiCall('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, metadata, app_id: APP_ID }), credentials: 'include' }),
-  
-  signOut: () => apiCall('/auth/signout', { method: 'POST', credentials: 'include' }),
-  
-  getSession: () => apiCall('/auth/user', { credentials: 'include' }),
-  
-  signInWithOAuth: (provider: 'google' | 'github' | 'apple') => {
-    const redirectUrl = typeof window !== 'undefined' ? window.location.href : '';
-    window.location.href = `${CENTRAL_API}/auth/callback?provider=${provider}&app_id=${APP_ID}&redirect=${encodeURIComponent(redirectUrl)}`;
+export const CentralAuth = {
+  /**
+   * Get current user session
+   */
+  async getSession(): Promise<CentralResponse<User>> {
+    return centralFetch<User>('/auth/session');
   },
-};
 
-// ============================================================================
-// CREDITS SYSTEM
-// ============================================================================
-
-export const credits = {
-  getBalance: (userId: string) => apiCall(`/credits/balance?user_id=${userId}`),
-  
-  spend: (userId: string, amount: number, description: string) =>
-    apiCall('/credits/spend', { method: 'POST', body: JSON.stringify({ user_id: userId, amount, description, app_id: APP_ID }) }),
-  
-  hasEnough: async (userId: string, required: number): Promise<boolean> => {
-    const { balance } = await credits.getBalance(userId) as any;
-    return (balance || 0) >= required;
-  },
-};
-
-// ============================================================================
-// PAYMENTS
-// ============================================================================
-
-export const payments = {
-  createStripeCheckout: (options: { priceId?: string; amount?: number; userId?: string; successUrl?: string; cancelUrl?: string }) =>
-    apiCall('/stripe', { method: 'POST', body: JSON.stringify({ ...options, app_id: APP_ID }) }),
-  
-  createPayPalOrder: (options: { amount: number; currency?: string; description?: string; userId?: string }) =>
-    apiCall('/paypal/orders', { method: 'POST', body: JSON.stringify({ ...options, app_id: APP_ID }) }),
-  
-  capturePayPalOrder: (orderId: string) =>
-    apiCall(`/paypal/orders/${orderId}/capture`, { method: 'POST', body: JSON.stringify({ app_id: APP_ID }) }),
-};
-
-// ============================================================================
-// SUPPORT & FEEDBACK
-// ============================================================================
-
-export const support = {
-  createTicket: (ticket: { user_id?: string; subject: string; description: string; priority?: string }) =>
-    apiCall('/tickets', { method: 'POST', body: JSON.stringify({ ...ticket, app_id: APP_ID }) }),
-  
-  getTickets: (userId: string) => apiCall(`/tickets?user_id=${userId}`),
-  
-  submitEnhancement: (enhancement: { user_id?: string; title: string; description: string }) =>
-    apiCall('/enhancements', { method: 'POST', body: JSON.stringify({ ...enhancement, app_id: APP_ID }) }),
-  
-  voteEnhancement: (enhancementId: string, userId: string) =>
-    apiCall(`/enhancements/${enhancementId}/vote`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
-};
-
-// ============================================================================
-// ACTIVITY & ANALYTICS
-// ============================================================================
-
-export const activity = {
-  log: (data: { user_id?: string; action: string; details?: any; metadata?: any }) =>
-    apiCall('/activity', { method: 'POST', body: JSON.stringify({ ...data, app_id: APP_ID }) }),
-  
-  getForUser: (userId: string, limit = 50) => apiCall(`/activity?user_id=${userId}&limit=${limit}`),
-};
-
-export const analytics = {
-  track: (event: string, properties?: any) =>
-    apiCall('/analytics/track', { method: 'POST', body: JSON.stringify({ event, properties: { ...properties, app_id: APP_ID } }) }),
-};
-
-// ============================================================================
-// CRM & RECOMMENDATIONS
-// ============================================================================
-
-export const crm = {
-  trackCustomer: (data: { user_id?: string; email: string; name?: string; tags?: string[]; metadata?: any }) =>
-    apiCall('/crm', { method: 'POST', body: JSON.stringify({ ...data, app_id: APP_ID }) }),
-  
-  getCustomer: (customerId: string) => apiCall(`/crm?customer_id=${customerId}`),
-};
-
-export const recommendations = {
-  get: (options?: { userId?: string; category?: string; limit?: number }) =>
-    apiCall(`/recommendations?app_id=${APP_ID}${options?.userId ? `&user_id=${options.userId}` : ''}${options?.category ? `&category=${options.category}` : ''}`),
-  
-  trackClick: (recommendedAppId: string, userId?: string) =>
-    apiCall('/recommendations', { method: 'POST', body: JSON.stringify({ source_app_id: APP_ID, recommended_app_id: recommendedAppId, user_id: userId }) }),
-};
-
-// ============================================================================
-// COLLECTIBLES (NEW)
-// ============================================================================
-
-export const collectibles = {
-  getCategories: () => apiCall('/collectibles'),
-  
-  getItems: (options: { category?: string; user_id?: string; search?: string; limit?: number; offset?: number }) =>
-    apiCall(`/collectibles?${new URLSearchParams(options as any)}`),
-  
-  getItem: (itemId: string) => apiCall(`/collectibles?item_id=${itemId}`),
-  
-  addItem: (item: { user_id: string; category: string; name: string; description?: string; condition?: string; grade?: string; purchase_price?: number; current_value?: number; images?: any[] }) =>
-    apiCall('/collectibles', { method: 'POST', body: JSON.stringify({ ...item, app_id: APP_ID }) }),
-  
-  updateItem: (id: string, updates: any) =>
-    apiCall('/collectibles', { method: 'PATCH', body: JSON.stringify({ id, ...updates }) }),
-  
-  deleteItem: (id: string) => apiCall(`/collectibles?id=${id}`, { method: 'DELETE' }),
-};
-
-// ============================================================================
-// VALUATION & GRADING (NEW)
-// ============================================================================
-
-export const valuation = {
-  getForItem: (itemId: string) => apiCall(`/valuation?item_id=${itemId}`),
-  
-  marketLookup: (name: string, category?: string) =>
-    apiCall(`/valuation?name=${encodeURIComponent(name)}${category ? `&category=${category}` : ''}`),
-  
-  record: (data: { item_id: string; value: number; source?: string; condition?: string; grade?: string }) =>
-    apiCall('/valuation', { method: 'POST', body: JSON.stringify({ ...data, app_id: APP_ID }) }),
-};
-
-export const grading = {
-  getCompanies: () => apiCall('/grading'),
-  getCompany: (code: string) => apiCall(`/grading?company=${code}`),
-  getForCategory: (category: string) => apiCall(`/grading?category=${category}`),
-};
-
-// ============================================================================
-// TRADING & WISHLIST (NEW)
-// ============================================================================
-
-export const trading = {
-  getTrades: (userId: string, status?: string) =>
-    apiCall(`/trading?user_id=${userId}${status ? `&status=${status}` : ''}`),
-  
-  getTrade: (tradeId: string) => apiCall(`/trading?trade_id=${tradeId}`),
-  
-  findMatches: (itemId: string) => apiCall(`/trading?find_matches=true&item_id=${itemId}`),
-  
-  createOffer: (data: { initiator_id: string; recipient_id: string; offered_items: string[]; requested_items?: string[]; message?: string }) =>
-    apiCall('/trading', { method: 'POST', body: JSON.stringify({ ...data, app_id: APP_ID }) }),
-  
-  updateStatus: (tradeId: string, status: string, userId?: string, message?: string) =>
-    apiCall('/trading', { method: 'PATCH', body: JSON.stringify({ trade_id: tradeId, status, user_id: userId, message }) }),
-};
-
-export const wishlist = {
-  get: (userId: string, category?: string) =>
-    apiCall(`/wishlist?user_id=${userId}${category ? `&category=${category}` : ''}`),
-  
-  add: (data: { user_id: string; item_name: string; category?: string; max_price?: number; priority?: number }) =>
-    apiCall('/wishlist', { method: 'POST', body: JSON.stringify({ ...data, app_id: APP_ID }) }),
-  
-  remove: (id: string) => apiCall(`/wishlist?id=${id}`, { method: 'DELETE' }),
-};
-
-// ============================================================================
-// GAMIFICATION (NEW)
-// ============================================================================
-
-export const gamification = {
-  getLeaderboard: (appId?: string, limit = 50) =>
-    apiCall(`/gamification?type=leaderboard&app_id=${appId || APP_ID}&limit=${limit}`),
-  
-  getChallenges: (category?: string) =>
-    apiCall(`/gamification?type=challenges&app_id=${APP_ID}${category ? `&category=${category}` : ''}`),
-  
-  getQuests: (userId: string) => apiCall(`/gamification?type=quests&user_id=${userId}`),
-  
-  getAchievements: (userId: string) => apiCall(`/gamification?type=achievements&user_id=${userId}`),
-  
-  getTrivia: (category?: string) => apiCall(`/gamification?type=trivia${category ? `&category=${category}` : ''}`),
-  
-  updateScore: (userId: string, score: number) =>
-    apiCall('/gamification', { method: 'POST', body: JSON.stringify({ type: 'score', user_id: userId, score, app_id: APP_ID }) }),
-  
-  unlockAchievement: (userId: string, achievementId: string) =>
-    apiCall('/gamification', { method: 'POST', body: JSON.stringify({ type: 'achievement', user_id: userId, achievement_id: achievementId }) }),
-  
-  submitTriviaAnswer: (userId: string, questionId: string, answer: string) =>
-    apiCall('/gamification', { method: 'POST', body: JSON.stringify({ type: 'trivia_answer', user_id: userId, question_id: questionId, answer, app_id: APP_ID }) }),
-};
-
-// ============================================================================
-// INVOICING (NEW)
-// ============================================================================
-
-export const invoicing = {
-  getInvoices: (userId: string, status?: string) =>
-    apiCall(`/invoicing?user_id=${userId}${status ? `&status=${status}` : ''}`),
-  
-  getInvoice: (invoiceId: string) => apiCall(`/invoicing?invoice_id=${invoiceId}`),
-  
-  getClients: (userId: string) => apiCall(`/invoicing?user_id=${userId}&type=clients`),
-  
-  createInvoice: (data: { user_id: string; client_id: string; items: any[]; due_date?: string }) =>
-    apiCall('/invoicing', { method: 'POST', body: JSON.stringify({ ...data, type: 'invoice' }) }),
-  
-  createClient: (data: { user_id: string; name: string; email: string; address?: string }) =>
-    apiCall('/invoicing', { method: 'POST', body: JSON.stringify({ ...data, type: 'client' }) }),
-  
-  updateStatus: (invoiceId: string, status: string) =>
-    apiCall('/invoicing', { method: 'PATCH', body: JSON.stringify({ invoice_id: invoiceId, status }) }),
-};
-
-// ============================================================================
-// PROPERTIES / REAL ESTATE (NEW)
-// ============================================================================
-
-export const properties = {
-  getListings: (options?: { city?: string; min_price?: number; max_price?: number; limit?: number }) =>
-    apiCall(`/properties?${new URLSearchParams(options as any)}`),
-  
-  getProperty: (propertyId: string) => apiCall(`/properties?property_id=${propertyId}`),
-  
-  getLeads: (userId: string) => apiCall(`/properties?type=leads&user_id=${userId}`),
-  
-  getSaved: (userId: string) => apiCall(`/properties?type=saved&user_id=${userId}`),
-  
-  createLead: (data: { user_id: string; name: string; email: string; phone?: string; property_id?: string }) =>
-    apiCall('/properties', { method: 'POST', body: JSON.stringify({ ...data, type: 'lead' }) }),
-  
-  saveProperty: (userId: string, propertyId: string) =>
-    apiCall('/properties', { method: 'POST', body: JSON.stringify({ user_id: userId, property_id: propertyId, type: 'save' }) }),
-};
-
-// ============================================================================
-// STOCKS / MARKET DATA (NEW)
-// ============================================================================
-
-export const stocks = {
-  getQuote: (symbol: string) => apiCall(`/stocks?type=quote&symbol=${symbol}`),
-  
-  getPortfolio: (userId: string) => apiCall(`/stocks?type=portfolio&user_id=${userId}`),
-  
-  getWatchlist: (userId: string) => apiCall(`/stocks?type=watchlist&user_id=${userId}`),
-  
-  getNews: (symbol?: string) => apiCall(`/stocks?type=news${symbol ? `&symbol=${symbol}` : ''}`),
-  
-  addToWatchlist: (userId: string, symbol: string) =>
-    apiCall('/stocks', { method: 'POST', body: JSON.stringify({ type: 'watchlist_add', user_id: userId, symbol }) }),
-  
-  addPosition: (data: { user_id: string; symbol: string; shares: number; avg_cost: number }) =>
-    apiCall('/stocks', { method: 'POST', body: JSON.stringify({ ...data, type: 'position' }) }),
-};
-
-// ============================================================================
-// TEMPLATES & DESIGN ASSETS (NEW)
-// ============================================================================
-
-export const templates = {
-  getCategories: () => apiCall('/templates'),
-  
-  get: (category: string, options?: { search?: string; style?: string; premium?: boolean; limit?: number }) =>
-    apiCall(`/templates?category=${category}&${new URLSearchParams(options as any)}`),
-  
-  trackDownload: (assetId: string) =>
-    apiCall('/templates', { method: 'PATCH', body: JSON.stringify({ asset_id: assetId }) }),
-};
-
-// ============================================================================
-// STOCK PHOTOS (NEW)
-// ============================================================================
-
-export const stockPhotos = {
-  search: (query: string, options?: { source?: 'unsplash' | 'pexels' | 'pixabay' | 'giphy' | 'all'; page?: number; per_page?: number }) =>
-    apiCall(`/stock-photos?query=${encodeURIComponent(query)}&${new URLSearchParams(options as any)}`),
-};
-
-// ============================================================================
-// SCANNING (NEW)
-// ============================================================================
-
-export const scanning = {
-  barcode: (barcode: string) =>
-    apiCall('/scanning', { method: 'POST', body: JSON.stringify({ type: 'barcode', barcode, app_id: APP_ID }) }),
-  
-  ocr: (imageUrl: string) =>
-    apiCall('/scanning', { method: 'POST', body: JSON.stringify({ type: 'ocr', image_url: imageUrl, app_id: APP_ID }) }),
-  
-  card: (imageUrl: string) =>
-    apiCall('/scanning', { method: 'POST', body: JSON.stringify({ type: 'card', image_url: imageUrl, app_id: APP_ID }) }),
-};
-
-// ============================================================================
-// SPIRITS (NEW)
-// ============================================================================
-
-export const spirits = {
-  getSpirits: (options?: { spirit_type?: string; search?: string; limit?: number }) =>
-    apiCall(`/spirits?type=spirits&${new URLSearchParams(options as any)}`),
-  
-  getSpirit: (id: string) => apiCall(`/spirits?type=spirits&id=${id}`),
-  
-  getDistilleries: (search?: string) => apiCall(`/spirits?type=distilleries${search ? `&search=${search}` : ''}`),
-  
-  getCocktails: (search?: string) => apiCall(`/spirits?type=cocktails${search ? `&search=${search}` : ''}`),
-  
-  getBars: (options?: { search?: string; lat?: number; lng?: number }) =>
-    apiCall(`/spirits?type=bars&${new URLSearchParams(options as any)}`),
-  
-  getCollection: (userId: string) => apiCall(`/spirits?type=collection&user_id=${userId}`),
-  
-  addTastingNote: (data: { user_id: string; spirit_id: string; rating: number; notes: string }) =>
-    apiCall('/spirits', { method: 'POST', body: JSON.stringify({ ...data, type: 'tasting_note' }) }),
-};
-
-// ============================================================================
-// PUBLISHING (NEW)
-// ============================================================================
-
-export const publishing = {
-  getBooks: (userId: string) => apiCall(`/publishing?user_id=${userId}`),
-  
-  getBook: (bookId: string) => apiCall(`/publishing?book_id=${bookId}`),
-  
-  createBook: (data: { user_id: string; title: string; description?: string }) =>
-    apiCall('/publishing', { method: 'POST', body: JSON.stringify({ ...data, type: 'book' }) }),
-  
-  createChapter: (data: { book_id: string; title: string; content?: string; order?: number }) =>
-    apiCall('/publishing', { method: 'POST', body: JSON.stringify({ ...data, type: 'chapter' }) }),
-  
-  updateBook: (bookId: string, updates: any) =>
-    apiCall('/publishing', { method: 'PATCH', body: JSON.stringify({ type: 'book', id: bookId, ...updates }) }),
-  
-  updateChapter: (chapterId: string, updates: any) =>
-    apiCall('/publishing', { method: 'PATCH', body: JSON.stringify({ type: 'chapter', id: chapterId, ...updates }) }),
-};
-
-// ============================================================================
-// EXPORT (NEW)
-// ============================================================================
-
-export const dataExport = {
-  toCSV: (data: any[], filename?: string) =>
-    apiCall('/export', { method: 'POST', body: JSON.stringify({ format: 'csv', data, filename }) }),
-  
-  toJSON: (data: any[], filename?: string) =>
-    apiCall('/export', { method: 'POST', body: JSON.stringify({ format: 'json', data, filename }) }),
-};
-
-// ============================================================================
-// JAVARI AI
-// ============================================================================
-
-export const javari = {
-  ask: (message: string, options?: { userId?: string; conversationId?: string; context?: any }) =>
-    fetch(`${JAVARI_API}/javari`, {
+  /**
+   * Sign in with email/password
+   */
+  async signIn(email: string, password: string): Promise<CentralResponse<User>> {
+    return centralFetch<User>('/auth/signin', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, user_id: options?.userId, conversation_id: options?.conversationId, context: { ...options?.context, app_id: APP_ID } }),
-    }).then(r => r.json()),
+      body: JSON.stringify({ email, password })
+    });
+  },
+
+  /**
+   * Sign up with email/password
+   */
+  async signUp(email: string, password: string, name?: string): Promise<CentralResponse<User>> {
+    return centralFetch<User>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, name })
+    });
+  },
+
+  /**
+   * Sign out
+   */
+  async signOut(): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/auth/signout', { method: 'POST' });
+  },
+
+  /**
+   * OAuth sign in - redirects to provider
+   */
+  async oAuthSignIn(provider: 'google' | 'github' | 'discord' | 'twitter', redirectTo?: string): Promise<void> {
+    const params = new URLSearchParams();
+    params.set('provider', provider);
+    if (redirectTo) params.set('redirect_to', redirectTo);
+    window.location.href = `${CENTRAL_API_BASE}/auth/oauth?${params.toString()}`;
+  },
+
+  /**
+   * Request password reset
+   */
+  async requestPasswordReset(email: string): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  },
+
+  /**
+   * Update password
+   */
+  async updatePassword(currentPassword: string, newPassword: string): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/auth/update-password', {
+      method: 'PUT',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+    });
+  },
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(updates: Partial<Pick<User, 'name' | 'display_name' | 'avatar_url'>>): Promise<CentralResponse<User>> {
+    return centralFetch<User>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+  },
+
+  /**
+   * Get auth redirect URL (for manual OAuth flows)
+   */
+  getOAuthUrl(provider: string, redirectTo?: string): string {
+    const params = new URLSearchParams();
+    params.set('provider', provider);
+    if (redirectTo) params.set('redirect_to', redirectTo);
+    return `${CENTRAL_API_BASE}/auth/oauth?${params.toString()}`;
+  }
 };
 
 // ============================================================================
-// NOTIFICATIONS & EMAIL
+// CREDITS SERVICE
 // ============================================================================
 
-export const notifications = {
-  send: (data: { userId: string; title: string; message: string; type?: string; actionUrl?: string }) =>
-    apiCall('/notifications', { method: 'POST', body: JSON.stringify({ ...data, app_id: APP_ID }) }),
-};
+export const CentralCredits = {
+  /**
+   * Get current credit balance
+   */
+  async getBalance(): Promise<CentralResponse<CreditBalance>> {
+    return centralFetch<CreditBalance>('/credits/balance');
+  },
 
-export const email = {
-  send: (data: { to: string; subject: string; html?: string; text?: string; template?: string; templateData?: any }) =>
-    apiCall('/email/send', { method: 'POST', body: JSON.stringify({ ...data, app_id: APP_ID }) }),
+  /**
+   * Spend credits for an action
+   */
+  async spend(amount: number, action: string, appId: string, description?: string): Promise<CentralResponse<CreditBalance>> {
+    return centralFetch<CreditBalance>('/credits/spend', {
+      method: 'POST',
+      body: JSON.stringify({ amount, action, app_id: appId, description })
+    });
+  },
+
+  /**
+   * Spend credits by action type (uses CREDIT_COSTS lookup)
+   */
+  async spendForAction(action: string, appId: string, description?: string): Promise<CentralResponse<CreditBalance>> {
+    const cost = getCreditCost(action);
+    return this.spend(cost, action, appId, description);
+  },
+
+  /**
+   * Check if user can afford an action (for UI gating)
+   */
+  async canAfford(action: string): Promise<{ allowed: boolean; cost: number; balance: number }> {
+    const cost = getCreditCost(action);
+    const response = await this.getBalance();
+    const balance = response.data?.balance || 0;
+    return { allowed: balance >= cost, cost, balance };
+  },
+
+  /**
+   * Refund credits
+   */
+  async refund(amount: number, reason: string, appId: string, originalTransactionId?: string): Promise<CentralResponse<CreditBalance>> {
+    return centralFetch<CreditBalance>('/credits/refund', {
+      method: 'POST',
+      body: JSON.stringify({ amount, reason, app_id: appId, original_transaction_id: originalTransactionId })
+    });
+  },
+
+  /**
+   * Get credit transaction history
+   */
+  async getHistory(limit: number = 50, offset: number = 0): Promise<CentralResponse<CreditTransaction[]>> {
+    return centralFetch<CreditTransaction[]>(`/credits/history?limit=${limit}&offset=${offset}`);
+  },
+
+  /**
+   * Purchase credits
+   */
+  async purchase(creditPackId: string): Promise<CentralResponse<PaymentIntent>> {
+    return centralFetch<PaymentIntent>('/credits/purchase', {
+      method: 'POST',
+      body: JSON.stringify({ credit_pack_id: creditPackId })
+    });
+  },
+
+  /**
+   * Set auto-reload preferences
+   */
+  async setAutoReload(enabled: boolean, threshold?: number, amount?: number): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/credits/auto-reload', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled, threshold, amount })
+    });
+  }
 };
 
 // ============================================================================
-// DEFAULT EXPORT
+// PAYMENTS SERVICE
 // ============================================================================
 
-export default {
-  auth, credits, payments, support, activity, analytics, crm, recommendations,
-  collectibles, valuation, grading, trading, wishlist, gamification,
-  invoicing, properties, stocks, templates, stockPhotos, scanning,
-  spirits, publishing, dataExport, javari, notifications, email,
+export const CentralPayments = {
+  /**
+   * Create Stripe checkout session
+   */
+  async createCheckout(planId: string, successUrl?: string, cancelUrl?: string): Promise<CentralResponse<{ url: string }>> {
+    return centralFetch<{ url: string }>('/payments/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        plan_id: planId, 
+        success_url: successUrl || window.location.href,
+        cancel_url: cancelUrl || window.location.href
+      })
+    });
+  },
+
+  /**
+   * Create PayPal order
+   */
+  async createPayPalOrder(planId: string): Promise<CentralResponse<{ orderId: string }>> {
+    return centralFetch<{ orderId: string }>('/payments/paypal/create', {
+      method: 'POST',
+      body: JSON.stringify({ plan_id: planId })
+    });
+  },
+
+  /**
+   * Capture PayPal payment
+   */
+  async capturePayPalOrder(orderId: string): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/payments/paypal/capture', {
+      method: 'POST',
+      body: JSON.stringify({ order_id: orderId })
+    });
+  },
+
+  /**
+   * Get subscription details
+   */
+  async getSubscription(): Promise<CentralResponse<{ plan: string; status: string; current_period_end: string; cancel_at_period_end: boolean }>> {
+    return centralFetch('/payments/subscription');
+  },
+
+  /**
+   * Cancel subscription
+   */
+  async cancelSubscription(immediately: boolean = false): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/payments/subscription/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ immediately })
+    });
+  },
+
+  /**
+   * Update payment method
+   */
+  async updatePaymentMethod(): Promise<CentralResponse<{ url: string }>> {
+    return centralFetch<{ url: string }>('/payments/update-method', { method: 'POST' });
+  },
+
+  /**
+   * Get billing history
+   */
+  async getBillingHistory(limit: number = 10): Promise<CentralResponse<any[]>> {
+    return centralFetch<any[]>(`/payments/history?limit=${limit}`);
+  }
 };
+
+// ============================================================================
+// SUPPORT SERVICE
+// ============================================================================
+
+export const CentralSupport = {
+  /**
+   * Create a support ticket
+   */
+  async createTicket(subject: string, description: string, category: string, appId?: string, priority: Ticket['priority'] = 'medium'): Promise<CentralResponse<Ticket>> {
+    return centralFetch<Ticket>('/support/tickets', {
+      method: 'POST',
+      body: JSON.stringify({ subject, description, category, app_id: appId, priority })
+    });
+  },
+
+  /**
+   * Get user's tickets
+   */
+  async getTickets(status?: Ticket['status']): Promise<CentralResponse<Ticket[]>> {
+    const params = status ? `?status=${status}` : '';
+    return centralFetch<Ticket[]>(`/support/tickets${params}`);
+  },
+
+  /**
+   * Get single ticket with messages
+   */
+  async getTicket(ticketId: string): Promise<CentralResponse<Ticket>> {
+    return centralFetch<Ticket>(`/support/tickets/${ticketId}`);
+  },
+
+  /**
+   * Add message to ticket
+   */
+  async addMessage(ticketId: string, content: string, attachments?: string[]): Promise<CentralResponse<TicketMessage>> {
+    return centralFetch<TicketMessage>(`/support/tickets/${ticketId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content, attachments })
+    });
+  },
+
+  /**
+   * Close a ticket
+   */
+  async closeTicket(ticketId: string): Promise<CentralResponse<Ticket>> {
+    return centralFetch<Ticket>(`/support/tickets/${ticketId}/close`, { method: 'POST' });
+  },
+
+  /**
+   * Search knowledge base
+   */
+  async searchKnowledgeBase(query: string): Promise<CentralResponse<any[]>> {
+    return centralFetch<any[]>(`/support/kb/search?q=${encodeURIComponent(query)}`);
+  },
+
+  /**
+   * Get FAQ for an app
+   */
+  async getFAQ(appId?: string): Promise<CentralResponse<any[]>> {
+    const params = appId ? `?app_id=${appId}` : '';
+    return centralFetch<any[]>(`/support/faq${params}`);
+  }
+};
+
+// ============================================================================
+// ENHANCEMENTS SERVICE (Feature Requests & Voting)
+// ============================================================================
+
+export const CentralEnhancements = {
+  /**
+   * Submit a feature request
+   */
+  async submit(title: string, description: string, category: string, appId?: string): Promise<CentralResponse<Enhancement>> {
+    return centralFetch<Enhancement>('/enhancements', {
+      method: 'POST',
+      body: JSON.stringify({ title, description, category, app_id: appId })
+    });
+  },
+
+  /**
+   * Get all enhancement requests
+   */
+  async getAll(filters?: { status?: string; category?: string; appId?: string; sort?: 'votes' | 'newest' | 'oldest' }): Promise<CentralResponse<Enhancement[]>> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.appId) params.set('app_id', filters.appId);
+    if (filters?.sort) params.set('sort', filters.sort);
+    return centralFetch<Enhancement[]>(`/enhancements?${params.toString()}`);
+  },
+
+  /**
+   * Get single enhancement
+   */
+  async get(enhancementId: string): Promise<CentralResponse<Enhancement>> {
+    return centralFetch<Enhancement>(`/enhancements/${enhancementId}`);
+  },
+
+  /**
+   * Vote for an enhancement
+   */
+  async vote(enhancementId: string): Promise<CentralResponse<Enhancement>> {
+    return centralFetch<Enhancement>(`/enhancements/${enhancementId}/vote`, { method: 'POST' });
+  },
+
+  /**
+   * Remove vote
+   */
+  async unvote(enhancementId: string): Promise<CentralResponse<Enhancement>> {
+    return centralFetch<Enhancement>(`/enhancements/${enhancementId}/vote`, { method: 'DELETE' });
+  },
+
+  /**
+   * Add comment to enhancement
+   */
+  async comment(enhancementId: string, content: string): Promise<CentralResponse<void>> {
+    return centralFetch<void>(`/enhancements/${enhancementId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content })
+    });
+  },
+
+  /**
+   * Get roadmap (planned/in-progress enhancements)
+   */
+  async getRoadmap(): Promise<CentralResponse<Enhancement[]>> {
+    return centralFetch<Enhancement[]>('/enhancements/roadmap');
+  }
+};
+
+// ============================================================================
+// ANALYTICS SERVICE
+// ============================================================================
+
+export const CentralAnalytics = {
+  /**
+   * Track an event
+   */
+  async track(event: string, properties?: Record<string, unknown>, appId?: string): Promise<void> {
+    try {
+      await fetch(`${CENTRAL_API_BASE}/analytics/track`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          event, 
+          properties, 
+          app_id: appId,
+          timestamp: new Date().toISOString(),
+          url: typeof window !== 'undefined' ? window.location.href : undefined,
+          referrer: typeof document !== 'undefined' ? document.referrer : undefined
+        })
+      });
+    } catch (error) {
+      console.error('Analytics track error:', error);
+    }
+  },
+
+  /**
+   * Track page view
+   */
+  async pageView(page: string, appId?: string): Promise<void> {
+    await this.track('page_view', { page }, appId);
+  },
+
+  /**
+   * Track conversion
+   */
+  async conversion(type: string, value?: number, appId?: string): Promise<void> {
+    await this.track('conversion', { type, value }, appId);
+  },
+
+  /**
+   * Identify user (for analytics platforms)
+   */
+  async identify(userId: string, traits?: Record<string, unknown>): Promise<void> {
+    try {
+      await fetch(`${CENTRAL_API_BASE}/analytics/identify`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, traits })
+      });
+    } catch (error) {
+      console.error('Analytics identify error:', error);
+    }
+  }
+};
+
+// ============================================================================
+// ACTIVITY SERVICE (Audit Trail)
+// ============================================================================
+
+export const CentralActivity = {
+  /**
+   * Log an activity
+   */
+  async log(action: string, details?: Record<string, unknown>, appId?: string): Promise<void> {
+    try {
+      await fetch(`${CENTRAL_API_BASE}/activity`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action, 
+          details, 
+          app_id: appId, 
+          timestamp: new Date().toISOString() 
+        })
+      });
+    } catch (error) {
+      console.error('Activity log error:', error);
+    }
+  },
+
+  /**
+   * Get activity history
+   */
+  async getHistory(limit: number = 50, appId?: string): Promise<CentralResponse<any[]>> {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    if (appId) params.set('app_id', appId);
+    return centralFetch<any[]>(`/activity?${params.toString()}`);
+  }
+};
+
+// ============================================================================
+// NOTIFICATIONS SERVICE
+// ============================================================================
+
+export const CentralNotifications = {
+  /**
+   * Get user notifications
+   */
+  async getAll(unreadOnly: boolean = false): Promise<CentralResponse<any[]>> {
+    return centralFetch<any[]>(`/notifications${unreadOnly ? '?unread=true' : ''}`);
+  },
+
+  /**
+   * Mark notification as read
+   */
+  async markRead(notificationId: string): Promise<CentralResponse<void>> {
+    return centralFetch<void>(`/notifications/${notificationId}/read`, { method: 'POST' });
+  },
+
+  /**
+   * Mark all as read
+   */
+  async markAllRead(): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/notifications/read-all', { method: 'POST' });
+  },
+
+  /**
+   * Get notification preferences
+   */
+  async getPreferences(): Promise<CentralResponse<any>> {
+    return centralFetch<any>('/notifications/preferences');
+  },
+
+  /**
+   * Update notification preferences
+   */
+  async updatePreferences(preferences: {
+    email_marketing?: boolean;
+    email_updates?: boolean;
+    email_tickets?: boolean;
+    push_enabled?: boolean;
+  }): Promise<CentralResponse<void>> {
+    return centralFetch<void>('/notifications/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(preferences)
+    });
+  }
+};
+
+// ============================================================================
+// APP REGISTRY SERVICE
+// ============================================================================
+
+export const CentralRegistry = {
+  /**
+   * Get all apps in the ecosystem
+   */
+  async getApps(): Promise<CentralResponse<any[]>> {
+    return centralFetch<any[]>('/registry/apps');
+  },
+
+  /**
+   * Get app by ID
+   */
+  async getApp(appId: string): Promise<CentralResponse<any>> {
+    return centralFetch<any>(`/registry/apps/${appId}`);
+  },
+
+  /**
+   * Report app health
+   */
+  async reportHealth(appId: string, status: 'healthy' | 'degraded' | 'down', details?: Record<string, unknown>): Promise<void> {
+    try {
+      await fetch(`${CENTRAL_API_BASE}/registry/health`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          app_id: appId, 
+          status, 
+          details,
+          timestamp: new Date().toISOString() 
+        })
+      });
+    } catch (error) {
+      console.error('Health report error:', error);
+    }
+  },
+
+  /**
+   * Get ecosystem status
+   */
+  async getStatus(): Promise<CentralResponse<any>> {
+    return centralFetch<any>('/registry/status');
+  }
+};
+
+// ============================================================================
+// CROSS-SELLING SERVICE
+// ============================================================================
+
+export const CentralCrossSell = {
+  /**
+   * Get recommended apps/products for user
+   */
+  async getRecommendations(currentAppId: string, limit: number = 5): Promise<CentralResponse<any[]>> {
+    return centralFetch<any[]>(`/recommendations?app_id=${currentAppId}&limit=${limit}`);
+  },
+
+  /**
+   * Track recommendation click
+   */
+  async trackClick(recommendationId: string, appId: string): Promise<void> {
+    await CentralAnalytics.track('recommendation_clicked', { 
+      recommendation_id: recommendationId,
+      source_app: appId 
+    }, appId);
+  }
+};
+
+// ============================================================================
+// EXPORT ALL SERVICES
+// ============================================================================
+
+export const CentralServices = {
+  // Core Services
+  Auth: CentralAuth,
+  Credits: CentralCredits,
+  Payments: CentralPayments,
+  
+  // Support & Feedback
+  Support: CentralSupport,
+  Enhancements: CentralEnhancements,
+  
+  // Tracking
+  Analytics: CentralAnalytics,
+  Activity: CentralActivity,
+  Notifications: CentralNotifications,
+  
+  // Platform
+  Registry: CentralRegistry,
+  CrossSell: CentralCrossSell,
+  
+  // Utilities
+  isAdmin,
+  shouldChargeCredits,
+  getCreditCost,
+  CREDIT_COSTS,
+  ADMIN_EMAILS,
+  
+  // Config
+  API_BASE: CENTRAL_API_BASE,
+  DOMAIN: CENTRAL_DOMAIN
+};
+
+export default CentralServices;
