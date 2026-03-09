@@ -4,6 +4,9 @@
 
 import { NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const FRED_API_KEY = process.env.FRED_API_KEY || 'fc8d5b44ab7b1b7b47da21d2454d0f2a';
 
 interface MacroEvent {

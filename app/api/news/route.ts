@@ -4,6 +4,9 @@
 
 import { NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // API Keys from credentials
 const NEWS_API_KEY = process.env.NEWSAPI_API_KEY || '29a98d7494b74400b8423f0d1143e8ff';
 const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY || 'pub_7b15a6d1ccd243389a774daaf72b64b4';

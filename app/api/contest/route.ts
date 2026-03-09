@@ -4,6 +4,9 @@
 
 import { NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
 interface Contest {

@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runAllCalibrations, getCalibrationReport } from '@/lib/learning/calibration-engine';
 import { generateJavariWeeklyReport } from '@/lib/learning/javari-consensus';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for full calibration
 

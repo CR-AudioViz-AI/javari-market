@@ -4,6 +4,9 @@
 
 import { NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '3868d31e5a2d122b78864cb5de409d6ea6a0bed46ed39108b79d836848ff9ce8';
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
 

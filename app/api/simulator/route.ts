@@ -1,6 +1,9 @@
 // Market Oracle - What-If Market Simulator API
 import { NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 const SCENARIOS: Record<string, { name: string; description: string; prompt: string }> = {

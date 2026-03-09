@@ -17,6 +17,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // API Keys from environment
 const API_KEYS = {
   alphaVantage: process.env.ALPHA_VANTAGE_API_KEY,

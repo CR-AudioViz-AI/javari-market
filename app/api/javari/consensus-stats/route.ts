@@ -5,6 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTopAICombinations, generateJavariWeeklyReport } from '@/lib/learning/javari-consensus';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export const runtime = 'nodejs';
 
 // GET - Get consensus stats

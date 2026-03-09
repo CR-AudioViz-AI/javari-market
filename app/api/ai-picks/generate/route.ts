@@ -5,6 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAllAIPicks, generatePickFromAI } from '@/lib/ai/pick-generator';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export const runtime = 'nodejs';
 export const maxDuration = 120; // Allow up to 2 minutes for multiple AIs
 

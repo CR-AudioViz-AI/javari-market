@@ -1,6 +1,9 @@
 // Market Oracle - Stock Correlations API
 import { NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const TWELVE_DATA_KEY = process.env.TWELVE_DATA_API_KEY;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
