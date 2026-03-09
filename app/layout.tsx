@@ -1,10 +1,9 @@
 import Script from 'next/script';
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+// next/font/google removed — use system font stack
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
-
+const inter = { className: 'font-sans' }; // system font fallback
 export const metadata: Metadata = {
   title: 'Market Oracle AI | Multi-AI Stock Analysis',
   description: 'Part of the CR AudioViz AI creative ecosystem',
