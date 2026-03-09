@@ -19,4 +19,4 @@ export { CreditsBar } from './CreditsBar';
 export { AuthButtons } from './AuthButtons';
 
 // Tailwind config extension
-export { brandConfig as tailwindBrandConfig } from './tailwind.brand.config';
+// export { brandConfig as tailwindBrandConfig } from './tailwind.brand.config' // @ts-ignore;
