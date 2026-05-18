@@ -4,7 +4,6 @@
 // Updated: December 13, 2025 - Fixed PickOutcome type casting
 // Purpose: Meta-learning system that learns which AI combinations to trust
 
-import { createClient } from '@supabase/supabase-js';
 import type { 
   AIModelName, 
   PickDirection, 
@@ -15,6 +14,14 @@ import type {
 } from '../types/learning';
 import { getLatestCalibration } from './calibration-engine';
 
+function getSupabase() {
+  var sb = require('@supabase/supabase-js')
+  var url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  return sb.createClient(url, key, { auth: { persistSession: false } })
+}
+
 // ============================================================================
 // SUPABASE CLIENT
 // ============================================================================
@@ -22,7 +29,6 @@ import { getLatestCalibration } from './calibration-engine';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // ============================================================================
 // BUILD JAVARI CONSENSUS
