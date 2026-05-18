@@ -4,8 +4,6 @@
 // Version: 1.0.0
 // =====================================================
 
-import { createClient } from '@supabase/supabase-js';
-
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -13,7 +11,6 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-
 
 // =====================================================
 // CONFIGURATION
@@ -26,16 +23,6 @@ const CRAIVERSE_CONFIG = {
 };
 
 // Create Supabase client
-export const supabase = createClient(
-  CRAIVERSE_CONFIG.supabaseUrl,
-  CRAIVERSE_CONFIG.supabaseAnonKey
-
-// =====================================================
-// TYPES
-// =====================================================
-
-export interface CRAIverseUser {
-  id: string;
   email: string;
   display_name?: string;
   avatar_url?: string;

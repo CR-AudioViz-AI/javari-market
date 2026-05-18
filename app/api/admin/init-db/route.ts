@@ -4,9 +4,17 @@
 // ADMIN ONLY - Initialize database tables
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  var sb = require('@supabase/supabase-js')
+  var url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  return sb.createClient(url, key, { auth: { persistSession: false } })
+}
+
 export const runtime = "nodejs";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'market-oracle-init-2025';
