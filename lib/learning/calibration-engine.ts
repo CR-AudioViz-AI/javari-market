@@ -3,7 +3,6 @@
 // Created: December 13, 2025
 // Purpose: Analyze AI performance and adjust behavior for improved accuracy
 
-import { createClient } from '@supabase/supabase-js';
 import type { 
   AIModelName, 
   AICalibration, 
@@ -13,6 +12,14 @@ import type {
 } from '../types/learning';
 import { getFactorRecommendationsForAI } from './factor-tracker';
 
+function getSupabase() {
+  var sb = require('@supabase/supabase-js')
+  var url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  return sb.createClient(url, key, { auth: { persistSession: false } })
+}
+
 // ============================================================================
 // SUPABASE CLIENT
 // ============================================================================
@@ -20,7 +27,6 @@ import { getFactorRecommendationsForAI } from './factor-tracker';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // ============================================================================
 // PROCESS PICK OUTCOME
