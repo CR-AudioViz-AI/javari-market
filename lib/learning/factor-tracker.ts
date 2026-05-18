@@ -3,8 +3,15 @@
 // Created: December 13, 2025
 // Purpose: Track which factors actually predict stock movements
 
-import { createClient } from '@supabase/supabase-js';
 import type { 
+
+function getSupabase() {
+  var sb = require('@supabase/supabase-js')
+  var url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  return sb.createClient(url, key, { auth: { persistSession: false } })
+}
   AIModelName, 
   FactorAssessment, 
   PickOutcome,
@@ -20,7 +27,6 @@ import type {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // ============================================================================
 // TYPES
