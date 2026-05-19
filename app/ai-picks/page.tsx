@@ -31,6 +31,7 @@ const AIDashboardContent = dynamic(
     ssr: false,
     loading: () => <LoadingDashboard />
   }
+);
 
 export default function AIDashboardPage() {
   return (
