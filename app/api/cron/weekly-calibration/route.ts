@@ -19,7 +19,6 @@ function getSupabase() {
 
 export const runtime = "nodejs";
 
-export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for full calibration
 
 export async function GET(request: NextRequest) {
