@@ -14,7 +14,6 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -22,9 +21,7 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-  return _supabase!;
 }
-const supabase = getSupabase();
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -82,6 +79,7 @@ interface Portfolio {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const supabase = getSupabase()!
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -437,6 +435,7 @@ async function getPortfolioSummary(userId: string): Promise<NextResponse> {
 // ============================================================================
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase()!
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
