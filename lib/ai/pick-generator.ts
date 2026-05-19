@@ -15,12 +15,15 @@ function getSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kteobfyferrukqeolofj.supabase.co";
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
     _supabase = createClient(url, key);
+  return _supabase;
   }
 }
 // Initialize Google AI
-const genAI = process.env.GEMINI_API_KEY 
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
+let _genAI: any = null;
+function getGenAI() {
+  if (!_genAI && process.env.GEMINI_API_KEY) _genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  return _genAI;
+}
 
 // ============================================================================
 // TIER TYPES
@@ -289,7 +292,7 @@ async function callAnthropic(prompt: string, model: string): Promise<string | nu
 async function callGoogle(prompt: string, model: string): Promise<string | null> {
   if (!genAI) return null;
   try {
-    const m = genAI.getGenerativeModel({ model });
+    const m = getGenAI()?.getGenerativeModel({ model });
     const result = await m.generateContent(prompt);
     return result.response.text() || null;
   } catch { return null; }
