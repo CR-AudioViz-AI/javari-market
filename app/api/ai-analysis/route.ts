@@ -13,7 +13,6 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-}
 export async function POST(request: NextRequest) {
   const supabase = getSupabase()!
   try {
