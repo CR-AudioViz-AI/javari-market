@@ -6,16 +6,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   if (!_supabase) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kteobfyferrukqeolofj.supabase.co";
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
     _supabase = createClient(url, key);
   }
-  return _supabase!;
 }
-const supabase = getSupabase();
 // Types
 export type Category = 'regular' | 'penny' | 'crypto';
 export type Direction = 'UP' | 'DOWN' | 'HOLD';
@@ -306,6 +303,7 @@ export interface GenerationResult {
 }
 
 export async function generateAllPicks(competitionId: string, weekNumber: number): Promise<GenerationResult> {
+  const supabase = getSupabase()!
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -424,6 +422,7 @@ function getNextFriday(): string {
 // ============================================
 
 export async function updatePricesAndScore(): Promise<{
+  const supabase = getSupabase()!
   updated: number;
   winners: number;
   losers: number;
