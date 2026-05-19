@@ -21,6 +21,7 @@ function LoadingDashboard() {
         <p className="text-gray-400">Loading Market Oracle...</p>
       </div>
     </div>
+  );
 }
 
 // Dynamically import the dashboard with no SSR
