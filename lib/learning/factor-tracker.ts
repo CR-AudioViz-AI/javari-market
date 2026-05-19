@@ -3,7 +3,14 @@
 // Created: December 13, 2025
 // Purpose: Track which factors actually predict stock movements
 
-import type { 
+import type {
+  AIModelName, 
+  FactorAssessment, 
+  PickOutcome,
+  FactorCategory,
+  MarketFactor,
+  MARKET_FACTORS 
+} from '../types/learning';
 
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
@@ -12,13 +19,7 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-  AIModelName, 
-  FactorAssessment, 
-  PickOutcome,
-  FactorCategory,
-  MarketFactor,
-  MARKET_FACTORS 
-} from '../types/learning';
+
 
 // ============================================================================
 // SUPABASE CLIENT
