@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Symbol is required' },
         { status: 400 }
+      );
     }
 
     const upperSymbol = symbol.toUpperCase();
