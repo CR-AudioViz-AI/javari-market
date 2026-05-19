@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,9 +9,7 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-  return _supabase!;
 }
-const supabase = getSupabase();
 export interface UserAccess {
   userId: string;
   tier: "free" | "starter" | "pro" | "enterprise";
@@ -39,6 +36,7 @@ const FEATURE_COSTS: Record<string, number> = {
 };
 
 export async function checkAccess(userId: string, feature: string): Promise<{ allowed: boolean; reason?: string }> {
+  const supabase = getSupabase()!
   // Get user subscription
   const { data: sub } = await supabase
     .from("user_subscriptions")
@@ -74,6 +72,7 @@ export async function checkAccess(userId: string, feature: string): Promise<{ al
 }
 
 export async function deductCredits(userId: string, feature: string, description?: string): Promise<boolean> {
+  const supabase = getSupabase()!
   const cost = FEATURE_COSTS[feature];
   if (!cost) return true;
 
