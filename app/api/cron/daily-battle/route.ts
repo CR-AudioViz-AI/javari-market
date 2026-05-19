@@ -12,16 +12,13 @@ export const maxDuration = 300; // 5 minutes max
 
 // Initialize Supabase client
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   if (!_supabase) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kteobfyferrukqeolofj.supabase.co";
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
     _supabase = createClient(url, key);
   }
-  return _supabase!;
 }
-const supabase = getSupabase();
 // AI Model Configuration
 const AI_MODELS = [
   { id: 'a1000000-0000-0000-0000-000000000001', name: 'TechVanguard AI', provider: 'openai', model: 'gpt-4-turbo-preview' },
@@ -252,6 +249,7 @@ async function callGemini(system: string, user: string, model: string): Promise<
 // ----- MAIN CRON HANDLER -----
 
 export async function GET(request: NextRequest) {
+  const supabase = getSupabase()!
   // Verify cron secret for security
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
@@ -385,5 +383,6 @@ async function notifyJavariNewPicks(pickCount: number): Promise<void> {
 
 // Also support POST for manual triggers
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase()!
   return GET(request);
 }
