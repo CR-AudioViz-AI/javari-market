@@ -5,7 +5,6 @@ function getUrl() { return process.env.NEXT_PUBLIC_SUPABASE_URL! }
 function getAnon() { return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! }
 function getSvc() { return process.env.SUPABASE_SERVICE_ROLE_KEY ?? getAnon() }
 
-let _supabase: SupabaseClient | null = null
 let _supabaseAdmin: SupabaseClient | null = null
 
 export function getSupabase(): SupabaseClient {
