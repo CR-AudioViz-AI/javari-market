@@ -31,6 +31,7 @@ async function fetchFredSeries(seriesId: string): Promise<number | null> {
     const response = await fetch(
       `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=1`,
       { next: { revalidate: 3600 } }
+    );
 
     if (!response.ok) return null;
     const data = await response.json();
