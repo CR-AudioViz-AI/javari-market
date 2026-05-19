@@ -9,7 +9,6 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-}
 export interface UserAccess {
   userId: string;
   tier: "free" | "starter" | "pro" | "enterprise";
