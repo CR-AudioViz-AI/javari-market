@@ -6,7 +6,6 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,10 +13,9 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-  return _supabase!;
 }
-const supabase = getSupabase();
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase()!
   try {
     const body = await request.json();
     const { symbol, analysisType, userId } = body;
