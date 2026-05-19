@@ -13,6 +13,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Download,
+  FileText,
+  Table,
+  CheckCircle,
+  AlertCircle,
+  Loader2
+} from 'lucide-react';
 
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
@@ -22,13 +29,6 @@ function getSupabase() {
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
 
-  Download,
-  FileText,
-  Table,
-  CheckCircle,
-  AlertCircle,
-  Loader2
-} from 'lucide-react';
 
 interface ExportOptions {
   dataType: 'portfolio' | 'picks' | 'transactions' | 'all';
