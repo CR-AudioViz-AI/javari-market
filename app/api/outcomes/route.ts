@@ -13,7 +13,6 @@ export const runtime = "nodejs";
   forceResolvePick 
 } from '@/lib/learning/outcome-tracker';
 
-export const runtime = 'nodejs';
 export const maxDuration = 120; // Allow up to 2 minutes for batch processing
 
 // POST: Process expired picks (for cron job)
