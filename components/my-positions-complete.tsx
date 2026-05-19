@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Activity,
+  PieChart,
+  AlertCircle,
+  RefreshCw
+} from 'lucide-react';
 
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
@@ -15,14 +23,6 @@ function getSupabase() {
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
 
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Activity,
-  PieChart,
-  AlertCircle,
-  RefreshCw
-} from 'lucide-react';
 
 interface Position {
   id: string;
