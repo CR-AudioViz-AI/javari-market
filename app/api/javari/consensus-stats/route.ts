@@ -8,7 +8,6 @@ import { getTopAICombinations, generateJavariWeeklyReport } from '@/lib/learning
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export const runtime = 'nodejs';
 
 // GET - Get consensus stats
 export async function GET(request: NextRequest) {
