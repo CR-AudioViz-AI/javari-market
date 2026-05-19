@@ -9,7 +9,6 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-}
 // Credit costs for features
 const FEATURE_COSTS = {
   ai_prediction: 5,
