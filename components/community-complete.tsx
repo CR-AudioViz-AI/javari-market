@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
+  MessageCircle,
+  Send,
+  Users,
+  TrendingUp,
+  Heart,
+  MessageSquare,
+  Clock
+} from 'lucide-react';
 
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
@@ -17,14 +25,6 @@ function getSupabase() {
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
 
-  MessageCircle,
-  Send,
-  Users,
-  TrendingUp,
-  Heart,
-  MessageSquare,
-  Clock
-} from 'lucide-react';
 
 interface Message {
   id: string;
