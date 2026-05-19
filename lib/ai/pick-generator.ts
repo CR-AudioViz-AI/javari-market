@@ -455,9 +455,9 @@ export async function generatePickFromAI(modelInput: string, symbol: string): Pr
 }
 
 export async function generateAllAIPicks(symbol: string, options?: { tier?: AITier; maxModels?: number }): Promise<{ 
-  const supabase = getSupabase()!
   picks: AIPick[]; consensus: ConsensusAssessment | null; dbErrors: string[]; aiStatus: Record<string, string>;
 }> {
+  const supabase = getSupabase()!
   const aiStatus: Record<string, string> = {}; const dbErrors: string[] = [];
   const m = await getMarketData(symbol);
   if (!m) return { picks: [], consensus: null, dbErrors: ['No market data'], aiStatus: {} };
