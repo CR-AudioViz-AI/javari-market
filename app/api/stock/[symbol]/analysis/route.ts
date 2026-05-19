@@ -26,6 +26,7 @@ async function getFinnhubQuote(symbol: string) {
     const res = await fetch(
       `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`,
       { next: { revalidate: 60 } }
+    );
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.c) return null;
