@@ -206,13 +206,13 @@ async function updateConsensusStats(
 
 // Main function to process expired picks
 export async function processExpiredPicks(): Promise<{
-  const supabase = getSupabase()!
   processed: number;
   wins: number;
   losses: number;
   expired: number;
   errors: string[];
 }> {
+  const supabase = getSupabase()!
   const results = { processed: 0, wins: 0, losses: 0, expired: 0, errors: [] as string[] };
   
   try {
@@ -297,11 +297,11 @@ export async function processExpiredPicks(): Promise<{
 
 // Get pending picks count and next expiration
 export async function getPendingPicksStatus(): Promise<{
-  const supabase = getSupabase()!
   pendingCount: number;
   nextExpiration: string | null;
   symbols: string[];
 }> {
+  const supabase = getSupabase()!
   const { data, error } = await supabase
     .from('market_oracle_picks')
     .select('symbol, expires_at')
@@ -323,11 +323,11 @@ export async function getPendingPicksStatus(): Promise<{
 
 // Force-resolve a pick for testing
 export async function forceResolvePick(pickId: string): Promise<{
-  const supabase = getSupabase()!
   success: boolean;
   outcome?: PickOutcome;
   error?: string;
 }> {
+  const supabase = getSupabase()!
   try {
     const { data: pick, error: fetchError } = await supabase
       .from('market_oracle_picks')
