@@ -8,7 +8,6 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -16,9 +15,7 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-  return _supabase!;
 }
-const supabase = getSupabase();
 // Challenge Configuration
 const CHALLENGE_CONFIG = {
   duration_days: 90,
@@ -61,6 +58,7 @@ interface ChallengeEnrollment {
 // ----- API HANDLERS -----
 
 export async function GET(request: NextRequest) {
+  const supabase = getSupabase()!
   const url = new URL(request.url);
   const action = url.searchParams.get('action') || 'status';
   const userId = url.searchParams.get('userId');
@@ -85,6 +83,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase()!
   try {
     const body = await request.json();
     const { action, userId, challengeId, data } = body;
