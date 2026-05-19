@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,9 +9,7 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-  return _supabase!;
 }
-const supabase = getSupabase();
 // Credit costs for features
 const FEATURE_COSTS = {
   ai_prediction: 5,
@@ -25,6 +22,7 @@ const FEATURE_COSTS = {
 
 // POST /api/premium/use-feature - Deduct credits for premium feature
 export async function POST(req: NextRequest) {
+  const supabase = getSupabase()!
   try {
     const body = await req.json();
     const { user_id, feature, metadata } = body;
@@ -94,6 +92,7 @@ export async function POST(req: NextRequest) {
 
 // GET /api/premium/pricing - Get feature pricing
 export async function GET() {
+  const supabase = getSupabase()!
   return NextResponse.json({
     features: Object.entries(FEATURE_COSTS).map(([feature, cost]) => ({
       feature,
