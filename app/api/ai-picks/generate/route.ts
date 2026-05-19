@@ -8,7 +8,6 @@ import { generateAllAIPicks, generatePickFromAI } from '@/lib/ai/pick-generator'
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export const runtime = 'nodejs';
 
 function getSupabase() {
   var sb = require('@supabase/supabase-js')
