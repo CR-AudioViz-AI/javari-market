@@ -10,16 +10,13 @@ import { getLatestCalibration } from '../learning/calibration-engine';
 import { buildJavariConsensus } from '../learning/javari-consensus';
 
 // Lazy Supabase client — initialized on first request (not at module load time)
-let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   if (!_supabase) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://kteobfyferrukqeolofj.supabase.co";
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
     _supabase = createClient(url, key);
   }
-  return _supabase!;
 }
-const supabase = getSupabase();
 // Initialize Google AI
 const genAI = process.env.GEMINI_API_KEY 
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -442,6 +439,7 @@ export function getModelsByTier(tier: AITier): string[] {
 export function resolveModelId(input: string): string { return LEGACY_TO_NEW[input] || input; }
 
 export async function generatePickFromAI(modelInput: string, symbol: string): Promise<AIPick | null> {
+  const supabase = getSupabase()!
   const modelId = resolveModelId(modelInput);
   const cfg = AI_MODELS[modelId]; if (!cfg || !cfg.enabled) return null;
   const m = await getMarketData(symbol); if (!m) return null;
@@ -454,6 +452,7 @@ export async function generatePickFromAI(modelInput: string, symbol: string): Pr
 }
 
 export async function generateAllAIPicks(symbol: string, options?: { tier?: AITier; maxModels?: number }): Promise<{ 
+  const supabase = getSupabase()!
   picks: AIPick[]; consensus: ConsensusAssessment | null; dbErrors: string[]; aiStatus: Record<string, string>;
 }> {
   const aiStatus: Record<string, string> = {}; const dbErrors: string[] = [];
