@@ -15,7 +15,6 @@ function getSupabase() {
   if (!url || !key) return null
   return sb.createClient(url, key, { auth: { persistSession: false } })
 }
-}
 // Challenge Configuration
 const CHALLENGE_CONFIG = {
   duration_days: 90,
