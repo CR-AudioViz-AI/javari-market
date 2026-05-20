@@ -12,7 +12,9 @@ export default function MarketOraclePage() {
   const [tab, setTab] = useState('dashboard')
   const [quotes, setQuotes] = useState({})
   const [picks, setPicks] = useState([])
-  const [watchlist, setWatchlist] = useState(['AAPL','MSFT','NVDA','TSLA','GOOGL','AMZN','META','SPY','QQQ','BRK-B'])
+  // Load watchlist from localStorage on client, fall back to defaults
+  const DEFAULT_WATCHLIST = ['AAPL','MSFT','NVDA','TSLA','GOOGL','AMZN','META','SPY','QQQ','BRK-B']
+  const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST)
   const [searchInput, setSearchInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [quotesLoading, setQuotesLoading] = useState(false)
@@ -50,9 +52,14 @@ export default function MarketOraclePage() {
     } catch { /* picks are optional */ }
   }, [])
 
-  // Initial load
+  // Initial load — restore watchlist from localStorage
   useEffect(() => {
-    fetchQuotes(watchlist)
+    try {
+      const saved = localStorage.getItem('javari_market_watchlist')
+      const wl = saved ? JSON.parse(saved) : DEFAULT_WATCHLIST
+      setWatchlist(wl)
+      fetchQuotes(wl)
+    } catch { fetchQuotes(watchlist) }
     fetchPicks()
   }, [])
 
@@ -67,13 +74,16 @@ export default function MarketOraclePage() {
     if (s && !watchlist.includes(s) && watchlist.length < 25) {
       const next = [...watchlist, s]
       setWatchlist(next)
+      try { localStorage.setItem('javari_market_watchlist', JSON.stringify(next)) } catch {}
       fetchQuotes([s])
     }
     setSearchInput('')
   }
 
   function removeFromWatchlist(symbol) {
-    setWatchlist(prev => prev.filter(s => s !== symbol))
+    const next = watchlist.filter(s => s !== symbol)
+    setWatchlist(next)
+    try { localStorage.setItem('javari_market_watchlist', JSON.stringify(next)) } catch {}
     setQuotes(prev => { const n = {...prev}; delete n[symbol]; return n })
   }
 
@@ -307,8 +317,19 @@ export default function MarketOraclePage() {
           {picks.length === 0 ? (
             <div style={{ ...S.card, textAlign: 'center', padding: '60px 24px' }}>
               <Brain size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
-              <p style={{ color: '#334155', fontSize: 14 }}>No picks yet today. Picks are auto-generated at 9:35 AM ET on market days.</p>
-              <p style={{ color: '#1e3a5f', fontSize: 12, marginTop: 8 }}>Check back after market open, or view historical picks in the AI Picks section.</p>
+              <p style={{ color: '#334155', fontSize: 14, marginBottom: 16 }}>No picks loaded yet. Auto-picks run at 9:35 AM ET on market days.</p>
+              <button onClick={async () => {
+                try {
+                  setPicks([])
+                  const r = await fetch('/api/cron/auto-picks')
+                  const d = await r.json()
+                  if (d.picks && d.picks.length > 0) setPicks(d.picks)
+                  else fetchPicks()
+                } catch { fetchPicks() }
+              }} style={{ background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: 'white', border: 'none', borderRadius: 10, padding: '12px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 12 }}>
+                ⚡ Generate Live Picks Now
+              </button>
+              <p style={{ color: '#1e3a5f', fontSize: 12 }}>Uses live Yahoo Finance data + Javari AI — free</p>
             </div>
           ) : picks.map((pick, i) => {
             const currentQ = quotes[pick.symbol]
