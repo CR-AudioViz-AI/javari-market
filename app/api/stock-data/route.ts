@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 /**
  * MARKET ORACLE - STOCK DATA API
  * Yahoo Finance integration
@@ -85,6 +86,9 @@ async function fetchYahooData(ticker: string): Promise<StockData | null> {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url);
     const ticker = searchParams.get('ticker');
