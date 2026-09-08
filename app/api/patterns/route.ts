@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Pattern Recognition API
 // Detects chart patterns and calculates historical success rates
 // Patterns: Head & Shoulders, Flags, Triangles, Double Tops/Bottoms, etc.
@@ -300,6 +301,9 @@ function detectPatterns(candles: any[], currentPrice: number): PatternResult[] {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   
   try {
