@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Earnings Calendar API
 // Shows upcoming earnings, historical surprises, and guidance
 // Sources: Finnhub, Financial Modeling Prep
@@ -204,6 +205,9 @@ function deduplicateEarnings(events: EarningsEvent[]): EarningsEvent[] {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   
   try {
