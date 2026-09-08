@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/outcomes/route.ts
 // Market Oracle Ultimate - Outcome Tracking API
 // Created: December 14, 2025
@@ -44,6 +45,9 @@ export const maxDuration = 120; // Allow up to 2 minutes for batch processing
 
 // POST: Process expired picks (for cron job)
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { action, pickId } = await request.json().catch(() => ({}));
     
