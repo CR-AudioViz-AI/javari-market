@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { secretKey, publishableKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
@@ -69,6 +70,9 @@ function safeRedirectPath(raw: string | null): string {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
   const redirectTo = safeRedirectPath(requestUrl.searchParams.get('redirect_to'));
