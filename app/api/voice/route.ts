@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Voice Briefing API (ElevenLabs)
 // Generates audio market briefings using AI voice synthesis
 // API: ElevenLabs Text-to-Speech
@@ -198,6 +199,9 @@ async function generateSpeech(text: string, voiceId: string): Promise<ArrayBuffe
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'voices';
   
