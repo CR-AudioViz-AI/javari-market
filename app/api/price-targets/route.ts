@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - AI Price Targets API
 // Multiple AI models generate price targets with consensus
 
@@ -128,6 +129,9 @@ function calculateConsensus(targets: PriceTarget[], price: number): any {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const start = Date.now();
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get('symbol');
