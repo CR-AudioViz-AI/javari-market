@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/live-quotes/route.ts — javari-market
 // Real-time stock quotes via Yahoo Finance (free, no API key)
 // Falls back to Finnhub if Yahoo is rate-limited
@@ -58,6 +59,9 @@ async function finnhubQuote(symbol: string): Promise<any> {
 }
 
 export async function GET(req: NextRequest) {
+  const limited = rateLimit(req);
+  if (limited) return limited;
+
   const symbols = (req.nextUrl.searchParams.get('symbols') || 'AAPL,MSFT,NVDA,TSLA,GOOGL,AMZN,META,SPY,QQQ,BRK-B').split(',').slice(0, 20)
   try {
     const quotes = await yahooQuotes(symbols)
