@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/sentiment/route.ts
 // Twitter/X Sentiment Analysis API for Market Oracle
 // Powered by xAI Grok-4 with real-time Twitter access
@@ -45,6 +46,9 @@ function getSupabase() {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const supabase = getSupabase()!
   const { searchParams } = new URL(request.url)
   const symbol = searchParams.get('symbol')
