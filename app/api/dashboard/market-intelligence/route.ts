@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/dashboard/market-intelligence/route.ts
 // Market Oracle - Unified Market Intelligence API
 // Created: December 22, 2025
@@ -235,6 +236,9 @@ function getMarketStatus(): 'open' | 'closed' | 'pre-market' | 'after-hours' {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     // Parallel fetch all data
     const [
