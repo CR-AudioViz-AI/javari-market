@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Multi-Source News Aggregator API
 // Aggregates news from 5+ sources with sentiment analysis
 // Sources: NewsAPI, NewsData.io, Currents, TheNewsAPI, GNews
@@ -323,6 +324,9 @@ function deduplicateNews(articles: NewsArticle[]): NewsArticle[] {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   
   try {
