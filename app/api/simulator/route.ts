@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - What-If Market Simulator API
 import { NextResponse } from 'next/server';
 
@@ -37,6 +38,9 @@ async function simulate(prompt: string): Promise<any> {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const start = Date.now();
   const { searchParams } = new URL(request.url);
   const scenario = searchParams.get('scenario');
