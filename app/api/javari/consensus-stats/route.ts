@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/javari/consensus-stats/route.ts
 // Market Oracle Ultimate - Javari Consensus Stats API
 // Created: December 13, 2025
@@ -11,6 +12,9 @@ export const runtime = "nodejs";
 
 // GET - Get consensus stats
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url);
     const format = searchParams.get('format');
