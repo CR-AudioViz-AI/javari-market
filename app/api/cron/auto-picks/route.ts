@@ -94,7 +94,29 @@ Respond ONLY with valid JSON array. No preamble. Example:
   return []
 }
 
-export async function GET() {
+
+function requireAdmin(request: Request): Response | null {
+  const secret = process.env.ADMIN_API_SECRET ?? process.env.CRON_SECRET ?? '';
+  if (!secret) {
+    return new Response(JSON.stringify({ error: 'Not configured.', code: 'NOT_CONFIGURED' }),
+      { status: 503, headers: { 'content-type': 'application/json' } });
+  }
+  const given = request.headers.get('x-admin-secret')
+    ?? (request.headers.get('authorization') ?? '').replace(/^Bearer /, '');
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  const ok = a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+  if (!ok) {
+    return new Response(JSON.stringify({ error: 'Forbidden', code: 'ADMIN_ONLY' }),
+      { status: 403, headers: { 'content-type': 'application/json' } });
+  }
+  return null;
+}
+
+export async function GET(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   const supabase = getSupabase()
   if (!supabase) return NextResponse.json({ error: 'DB unavailable' }, { status: 503 })
 
