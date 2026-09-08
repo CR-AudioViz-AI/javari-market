@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/market-oracle/test-gpt4/route.ts - GPT-4 DIAGNOSTIC
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -17,6 +18,9 @@ function getSupabase() {
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const limited = rateLimit(req);
+  if (limited) return limited;
+
   const supabase = getSupabase()!
   const log: string[] = [];
   
