@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/stock/[symbol]/analysis/route.ts
 // Market Oracle - Self-Contained Stock Analysis API
 // Created: December 22, 2025
@@ -286,6 +287,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ symbol: string }> }
 ) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const { symbol: rawSymbol } = await params;
   const symbol = rawSymbol.toUpperCase();
 
