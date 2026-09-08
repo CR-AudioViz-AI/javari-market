@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/ai-picks/generate/route.ts
 // Market Oracle Ultimate - Generate AI Picks API
 // Updated: December 14, 2025 - Added AI status reporting
@@ -41,6 +42,9 @@ function getSupabase() {
 export const maxDuration = 120; // Allow up to 2 minutes for multiple AIs
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { symbol, aiModel } = await request.json();
 
