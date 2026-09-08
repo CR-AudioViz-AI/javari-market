@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await readBody<Record<string, unknown>>(request);
     if (!parsed.ok) return parsed.response;
-    const { action, pickId } = parsed.body as any;.catch(() => ({}));
+    const { action, pickId } = parsed.body as any;
     
     // Force resolve a specific pick (for testing)
     if (action === 'force-resolve' && pickId) {
