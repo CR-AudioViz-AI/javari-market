@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Macro Economic Alerts API
 // Tracks and alerts on major economic events
 // Sources: FRED, Economic calendars
@@ -150,6 +151,9 @@ async function fetchLatestFREDData(): Promise<any> {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   
   try {
