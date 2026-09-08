@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Insider Trading Alerts API
 // Tracks executive and institutional insider transactions
 // Sources: Finnhub, Financial Modeling Prep
@@ -283,6 +284,9 @@ function detectClusters(transactions: InsiderTransaction[]): ClusterAlert[] {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   
   try {
