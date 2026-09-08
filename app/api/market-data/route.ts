@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 /**
  * ENHANCED MARKET DATA API
  * Multi-source market data aggregation
@@ -399,6 +400,9 @@ async function fetchCryptoData(symbol: string): Promise<QuoteData | null> {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const searchParams = request.nextUrl.searchParams;
   const symbol = searchParams.get('symbol')?.toUpperCase();
   const type = searchParams.get('type') as 'stock' | 'crypto' | 'etf' | 'forex' || 'stock';
