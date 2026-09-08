@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/auth/sso/consume/route.ts — spend the handoff code, server side
 //
 // The browser hands this route the opaque code it arrived with. This calls
@@ -20,6 +21,9 @@ const CORE_ORIGIN = "https://craudiovizai.com";
 const NO_STORE = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } as const;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const limited = rateLimit(req);
+  if (limited) return limited;
+
   let body: { code?: string };
   try {
     body = (await req.json()) as typeof body;
