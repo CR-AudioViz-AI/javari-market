@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Market Mood Gauge API
 // Comprehensive fear/greed indicator with multiple data sources
 // Inspired by CNN Fear & Greed but with AI enhancement
@@ -342,7 +343,10 @@ function calculateOverallMood(indicators: MoodIndicator[]): any {
   return { score, signal, label, emoji, color, implication };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   
   try {
