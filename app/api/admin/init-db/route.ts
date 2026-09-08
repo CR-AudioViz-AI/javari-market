@@ -40,7 +40,29 @@ export const runtime = "nodejs";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'market-oracle-init-2025';
 
+
+function requireAdmin(request: Request): Response | null {
+  const secret = process.env.ADMIN_API_SECRET ?? process.env.CRON_SECRET ?? '';
+  if (!secret) {
+    return new Response(JSON.stringify({ error: 'Not configured.', code: 'NOT_CONFIGURED' }),
+      { status: 503, headers: { 'content-type': 'application/json' } });
+  }
+  const given = request.headers.get('x-admin-secret')
+    ?? (request.headers.get('authorization') ?? '').replace(/^Bearer /, '');
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  const ok = a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+  if (!ok) {
+    return new Response(JSON.stringify({ error: 'Forbidden', code: 'ADMIN_ONLY' }),
+      { status: 403, headers: { 'content-type': 'application/json' } });
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     // Check authorization
     const authHeader = request.headers.get('authorization');
