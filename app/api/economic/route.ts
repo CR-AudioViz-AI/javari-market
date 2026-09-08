@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Economic Data API (FRED)
 // Provides Federal Reserve economic data for market analysis
 // API: FRED (Federal Reserve Economic Data)
@@ -87,6 +88,9 @@ function determineImpact(
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   
   try {
