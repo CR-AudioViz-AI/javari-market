@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkAccess, deductCredits } from "@/lib/premium-gate";
@@ -75,7 +76,9 @@ function unauthorised(): NextResponse {
 export async function POST(request: NextRequest) {
   const supabase = getSupabase()!
   try {
-    const body = await request.json();
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body as any;
     // userId deliberately not read from the body.
     const { symbol, analysisType } = body;
     const userId = await callerId(request);
