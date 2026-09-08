@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { urlSegment } from '@craudioviz/platform-sdk/lib/egress-guard';
@@ -30,6 +31,9 @@ async function fetchStockPrice(symbol: string): Promise<number | null> {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url)
     const limitParam = searchParams.get('limit')
