@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // 2026-09-04: retired model replaced.
 //
 // gemini-1.5-flash no longer exists at the provider. A request naming it returns 404, and
@@ -198,6 +199,9 @@ function getTimeRemaining(contest: Contest): string {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const startTime = Date.now();
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'list';
