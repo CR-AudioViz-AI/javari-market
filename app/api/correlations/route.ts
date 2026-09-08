@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // Market Oracle - Stock Correlations API
 import { NextResponse } from 'next/server';
 
@@ -80,6 +81,9 @@ function getImplication(c: number, s1: string, s2: string): string {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const start = Date.now();
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get('symbol');
