@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/scanners/crypto/route.ts
 // Market Oracle - Crypto Screener API
 // Created: December 22, 2025
@@ -171,6 +172,9 @@ function analyzeSignals(coin: CoinMarket): { signals: string[]; score: number; s
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   
   // Parse filters
