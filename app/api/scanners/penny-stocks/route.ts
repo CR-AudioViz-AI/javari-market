@@ -1,3 +1,4 @@
+import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/scanners/penny-stocks/route.ts
 // Market Oracle - Penny Stock Scanner API
 // Created: December 22, 2025
@@ -180,6 +181,9 @@ async function scanPennyStocks(): Promise<PennyStock[]> {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
   const minPrice = parseFloat(searchParams.get('minPrice') || '0');
   const maxPrice = parseFloat(searchParams.get('maxPrice') || '5');
