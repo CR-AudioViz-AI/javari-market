@@ -1,3 +1,4 @@
+import { readBody } from '@/lib/api/body';
 import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/outcomes/route.ts
 // Market Oracle Ultimate - Outcome Tracking API
@@ -49,7 +50,9 @@ export async function POST(request: NextRequest) {
   if (limited) return limited;
 
   try {
-    const { action, pickId } = await request.json().catch(() => ({}));
+    const parsed = await readBody<Record<string, unknown>>(request);
+    if (!parsed.ok) return parsed.response;
+    const { action, pickId } = parsed.body as any;.catch(() => ({}));
     
     // Force resolve a specific pick (for testing)
     if (action === 'force-resolve' && pickId) {
