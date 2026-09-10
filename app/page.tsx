@@ -114,7 +114,7 @@ export default function MarketOraclePage() {
   return (
     <div style={S.wrap}>
       {/* NAV */}
-      <nav style={S.nav}>
+      <nav data-app-chrome style={S.nav}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <TrendingUp size={20} color="#3b82f6" />
           <span style={{ fontWeight: 800, fontSize: 15, color: '#60a5fa' }}>Market Oracle</span>
@@ -389,7 +389,7 @@ export default function MarketOraclePage() {
         </div>
       )}
 
-      <footer style={{ background: '#010308', borderTop: '1px solid rgba(59,130,246,0.08)', padding: '20px 24px', textAlign: 'center', marginTop: 40 }}>
+      <footer data-app-chrome style={{ background: '#010308', borderTop: '1px solid rgba(59,130,246,0.08)', padding: '20px 24px', textAlign: 'center', marginTop: 40 }}>
         <p style={{ color: '#0f2040', fontSize: 11 }}>© 2026 CR AudioViz AI, LLC · EIN 39-3646201 · Market data via Yahoo Finance · Not investment advice</p>
       </footer>
     </div>

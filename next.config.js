@@ -1,3 +1,5 @@
+// 2026-09-10 factory: embed policy (frame-ancestors) comes from the platform SDK.
+const __embed = require('@craudioviz/platform-sdk/embed-headers.js');
 // Build trigger: 1779135724
 /** @type {import("next").NextConfig} */
 const nextConfig={
@@ -13,9 +15,9 @@ const nextConfig={
           {
             source: '/:path*',
             headers: [
+              ...__embed.embedSecurityHeaders({ brandedDomain: 'javarimarket.com' }),
               { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-              { key: 'Content-Security-Policy-Report-Only', value: `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.paypal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.paypal.com; frame-src 'self' https://js.stripe.com https://*.paypal.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests` },
-              { key: 'X-Frame-Options', value: 'DENY' },
+              { key: 'Content-Security-Policy-Report-Only', value: `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.paypal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.paypal.com; frame-src 'self' https://js.stripe.com https://*.paypal.com; frame-ancestors 'self' https://craudiovizai.com https://www.craudiovizai.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests` },
               { key: 'X-Content-Type-Options', value: 'nosniff' },
               { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
               { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
