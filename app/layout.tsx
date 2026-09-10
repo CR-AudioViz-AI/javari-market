@@ -1,7 +1,9 @@
-import { ThemeProvider, BrandedHeader, BrandedFooter } from '@craudioviz/platform-sdk'
-import './globals.css'
 // app/layout.tsx — server-rendered brand shell
 // CR AudioViz AI · EIN: 39-3646201 · May 2026
+// globals.css MUST stay imported. Next emits a stylesheet link only for CSS
+// reachable from the module graph; without this import the site served raw
+// unstyled HTML while every build passed.
+import './globals.css'
 import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
@@ -13,23 +15,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body style={{ margin: 0, padding: 0, fontFamily: 'system-ui, sans-serif' }}>
-        {/* 2026-09-07: platform chrome from the SDK.
-            ThemeProvider is REQUIRED - BrandedHeader renders ThemeToggle, which
-            calls useTheme, which THROWS without a provider above it. A green
-            build and a 500 on every render. */}
-        <ThemeProvider>
-        <BrandedHeader
-          appName="Javari Market"
-          quickLinks={[
-            { label: 'All Apps', href: 'https://craudiovizai.com/apps' },
-            { label: 'Games', href: 'https://craudiovizai.com/games' },
-            { label: 'Tools', href: 'https://craudiovizai.com/tools' },
-            { label: 'Market', href: 'https://craudiovizai.com/market' },
-            { label: 'Pricing', href: 'https://craudiovizai.com/pricing' },
-            { label: 'Help', href: 'https://craudiovizai.com/help' },
-          ]}
-        />
-
         {/* 2026-09-10: WCAG 2.4.1. Without this a keyboard user traverses the
             entire navigation on every page before reaching anything. Visually
             hidden until focused, which is the point - it is for people who are
@@ -60,8 +45,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="https://craudiovizai.com/auth/signup" style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>Sign Up Free</a>
           </p>
         </footer>
-        <BrandedFooter appName="Javari Market" />
-        </ThemeProvider>
       </body>
     </html>
   )
