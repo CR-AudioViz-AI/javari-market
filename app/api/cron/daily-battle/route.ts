@@ -267,12 +267,11 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    // Allow manual trigger for testing
-    const url = new URL(request.url);
-    if (url.searchParams.get('test') !== 'true') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // 2026-09-11: only the scheduler (or an operator holding CRON_SECRET) may run the
+  // battle. The old "?test=true" escape let anyone on the internet trigger it - four
+  // paid AI providers per call, and picks written straight into the leaderboard.
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
   console.log(`[DAILY BATTLE] Starting - ${new Date().toISOString()}`);
@@ -315,7 +314,8 @@ export async function GET(request: NextRequest) {
           
           // Save to database
           const { error } = await supabase.from('stock_picks').insert({
-            id: `pick-${Date.now()}-${model.id.slice(-4)}`,
+            // 2026-09-11: id is a uuid column with a default. A text id (`pick-<ms>-xxxx`) made
+            // EVERY insert fail since ~December - four paid AI calls a day, results discarded.
             ai_model_id: model.id,
             ticker: pick.ticker,
             symbol: pick.ticker,

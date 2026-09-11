@@ -193,11 +193,9 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    const url = new URL(request.url);
-    if (url.searchParams.get('test') !== 'true') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // 2026-09-11: scheduler / CRON_SECRET only - "?test=true" let anyone rewrite results.
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
   console.log(`[UPDATE RESULTS] Starting - ${new Date().toISOString()}`);
