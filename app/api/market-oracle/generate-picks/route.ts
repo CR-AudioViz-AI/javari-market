@@ -11,8 +11,10 @@ function getSupabase() {
     const url = supabaseUrl();
     const key = secretKey()|| "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
     _supabase = createClient(url, key);
-    return _supabase;
-}
+  }
+  // 2026-09-11: the return sat INSIDE the if - a warm server got undefined ->
+  // "Cannot read properties of undefined (reading 'from')" on every request after the first.
+  return _supabase;
 }
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
