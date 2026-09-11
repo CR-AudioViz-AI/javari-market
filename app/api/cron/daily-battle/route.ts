@@ -35,11 +35,16 @@ function getSupabase() {
 // AI Model Configuration
 const AI_MODELS = [
   { id: 'a1000000-0000-0000-0000-000000000001', name: 'TechVanguard AI', provider: 'openai', model: 'gpt-4.1-nano' },
-  { id: 'a2000000-0000-0000-0000-000000000002', name: 'ValueHunter Pro', provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+  // 2026-09-11: the Anthropic account behind every valid key has no credit ("credit balance
+  // too low"); the other keys are invalid. Until credits are added these two personas run
+  // on Gemini 3.6 Flash (Google's current Flash; 2.5 is closed to new users). Switch back: provider 'anthropic',
+  // model 'claude-haiku-4-5-20251001' (low cost) or a Sonnet model.
+  { id: 'a2000000-0000-0000-0000-000000000002', name: 'ValueHunter Pro', provider: 'google', model: 'gemini-3.6-flash' },
   { id: 'a3000000-0000-0000-0000-000000000003', name: 'SwingTrader X', provider: 'openai', model: 'gpt-4.1-nano' },
-  { id: 'a4000000-0000-0000-0000-000000000004', name: 'DividendKing', provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+  { id: 'a4000000-0000-0000-0000-000000000004', name: 'DividendKing', provider: 'google', model: 'gemini-3.6-flash' },
   { id: 'a5000000-0000-0000-0000-000000000005', name: 'CryptoQuantum', provider: 'openai', model: 'gpt-4.1-nano' },
-  { id: 'a6000000-0000-0000-0000-000000000006', name: 'GlobalMacro AI', provider: 'google', model: 'gemini-2.0-flash-exp' },
+  // gemini-2.0-flash-exp was retired by Google (404) - GlobalMacro produced nothing.
+  { id: 'a6000000-0000-0000-0000-000000000006', name: 'GlobalMacro AI', provider: 'google', model: 'gemini-3.6-flash' },
 ];
 
 // Ticker pools
@@ -246,12 +251,18 @@ async function callGemini(system: string, user: string, model: string): Promise<
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: `${system}\n\n${user}` }] }],
-          generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+          // Gemini 3.x thinks before answering and spends output budget doing it; 500 tokens
+          // could leave the pick empty. 2048 leaves room. (3.x rejects thinkingBudget: 0.)
+          generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
         })
       }
     );
-    
     const data = await response.json();
+    if (!response.ok) {
+      // Provider errors used to be swallowed: a retired model produced nothing for months.
+      console.error(`Gemini ${model} HTTP ${response.status}: ${JSON.stringify(data?.error ?? data).slice(0, 300)}`);
+      return null;
+    }
     return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
   } catch (error) {
     console.error('Gemini call failed:', error);
@@ -299,7 +310,12 @@ export async function GET(request: NextRequest) {
     const expiryDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
     // Step 3: Generate picks for each AI model
+    // One pick per AI per day: a re-run or a scheduler retry must not give an AI a second
+    // pick (or a second paid call) on the same date.
+    const { data: already } = await supabase.from('stock_picks').select('ai_model_id').eq('pick_date', pickDate);
+    const pickedToday = new Set((already ?? []).map((r: { ai_model_id: string }) => r.ai_model_id));
     for (const model of AI_MODELS) {
+      if (pickedToday.has(model.id)) { results.ai_models_processed.push(`${model.name} (already picked today)`); continue; }
       console.log(`[DAILY BATTLE] Generating picks for ${model.name}...`);
       
       try {
