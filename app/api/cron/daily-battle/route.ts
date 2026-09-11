@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
+import { getStockPrices } from '@/lib/market/prices';
 
 // Force dynamic execution
 export const dynamic = 'force-dynamic';
@@ -62,30 +63,10 @@ const CRYPTO_MAP: Record<string, string> = {
 
 // ----- PRICE FETCHING FUNCTIONS -----
 
+// 2026-09-11: one call per ticker to Alpha Vantage (free: 25/day, 5/min) exhausted the
+// quota on the 35-stock pool, starving settlement. Batch lookup with fallbacks instead.
 async function fetchStockPrices(tickers: string[]): Promise<Map<string, number>> {
-  const prices = new Map<string, number>();
-  const apiKey = process.env.ALPHA_VANTAGE_API_KEY || process.env.TWELVE_DATA_API_KEY;
-  
-  for (const ticker of tickers) {
-    try {
-      // Try Alpha Vantage first
-      const response = await fetch(
-        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`
-      );
-      const data = await response.json();
-      
-      if (data['Global Quote'] && data['Global Quote']['05. price']) {
-        prices.set(ticker, parseFloat(data['Global Quote']['05. price']));
-      }
-      
-      // Rate limiting
-      await new Promise(r => setTimeout(r, 250));
-    } catch (error) {
-      console.error(`Failed to fetch price for ${ticker}:`, error);
-    }
-  }
-  
-  return prices;
+  return getStockPrices(tickers);
 }
 
 async function fetchCryptoPrices(tickers: string[]): Promise<Map<string, number>> {

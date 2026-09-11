@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
+import { getStockPrice } from '@/lib/market/prices';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -43,23 +44,10 @@ interface PickResult {
 
 // ----- PRICE FETCHING -----
 
+// 2026-09-11: shared batch price lookup (Yahoo -> Twelve Data -> Alpha Vantage); the old
+// per-ticker Alpha Vantage call failed once the battle had used the free quota.
 async function fetchCurrentStockPrice(ticker: string): Promise<number | null> {
-  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
-  
-  try {
-    const response = await fetch(
-      `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`
-    );
-    const data = await response.json();
-    
-    if (data['Global Quote'] && data['Global Quote']['05. price']) {
-      return parseFloat(data['Global Quote']['05. price']);
-    }
-    return null;
-  } catch (error) {
-    console.error(`Failed to fetch price for ${ticker}:`, error);
-    return null;
-  }
+  return getStockPrice(ticker);
 }
 
 async function fetchCryptoPrice(ticker: string): Promise<number | null> {
