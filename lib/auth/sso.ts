@@ -52,6 +52,10 @@ function cleanUrl(): void {
  *          browser is being sent to the identity origin, 'signed-out' otherwise.
  */
 export async function attemptSso(): Promise<'signed-in' | 'redirecting' | 'signed-out'> {
+  // factory: embedded on craudiovizai.com the platform supplies the session through the
+  // embed bridge; bouncing from here would navigate the FRAME to craudiovizai.com.
+  if (typeof window !== 'undefined' && window.self !== window.top) return 'signed-out'
+
   const params = new URLSearchParams(window.location.search)
 
   const code = params.get('sso_code')
