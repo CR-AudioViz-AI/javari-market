@@ -8,7 +8,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, userFromRequest, currentDay } from "@/lib/market/player";
-import { MARKET_IDS, MARKETS, pricesFor, type MarketId } from "@/lib/market/battle";
+import { MARKET_IDS, MARKETS, universePrices, type MarketId } from "@/lib/market/battle";
+import { getUniverse } from "@/lib/market/universe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,7 +62,15 @@ export async function GET(req: Request): Promise<NextResponse> {
       ok: true, day,
       profile: enrolled ? { handle: enrolled.handle, displayName: enrolled.display_name } : null,
       picks: mine,
-      universe: Object.fromEntries(MARKET_IDS.map((m) => [m, { label: MARKETS[m].label, symbols: MARKETS[m].symbols }])),
+      // The full universe for each market, with prices - the player searches it rather
+      // than choosing from a short list. 2026-09-12
+      universe: Object.fromEntries(await Promise.all(MARKET_IDS.map(async (m) => {
+        const rows = await getUniverse(d, m, day.pickDate);
+        return [m, {
+          label: MARKETS[m].label,
+          symbols: rows.filter((r) => r.price !== null).map((r) => ({ symbol: r.symbol, name: r.name, price: r.price })),
+        }];
+      }))),
     });
   } catch (e) {
     console.error(JSON.stringify({ level: "error", msg: "market.player_get_failed", error: e instanceof Error ? e.message : String(e) }));
@@ -111,12 +120,13 @@ export async function POST(req: Request): Promise<NextResponse> {
     const needed = [...new Set(parsed.data.picks.map((p) => p.category))] as MarketId[];
     const priceByMarket = new Map<MarketId, Map<string, number>>();
     for (const m of needed) {
-      try { priceByMarket.set(m, await pricesFor(m)); } catch { priceByMarket.set(m, new Map()); }
+      try { priceByMarket.set(m, await universePrices(d, m, day.pickDate)); } catch { priceByMarket.set(m, new Map()); }
     }
 
     const rows = parsed.data.picks.map((p) => {
       const market = p.category as MarketId;
-      if (!MARKETS[market].symbols.includes(p.symbol as never)) throw new Error(`${p.symbol} is not in ${MARKETS[market].label}`);
+      // Validated against today's universe snapshot - the same list the models chose from.
+      if (!priceByMarket.get(market)?.has(p.symbol)) throw new Error(`${p.symbol} is not in ${MARKETS[market].label} today`);
       return {
         user_id: user.id, pick_date: day.pickDate, category: p.category, symbol: p.symbol,
         entry_price: priceByMarket.get(market)?.get(p.symbol) ?? null,

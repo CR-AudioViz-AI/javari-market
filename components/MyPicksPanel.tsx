@@ -13,7 +13,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getAccessToken, signIn } from "@/lib/auth/access-token";
 
-type Universe = Record<string, { label: string; symbols: string[] }>;
+type Sym = { symbol: string; name: string | null; price: number | null };
+type Universe = Record<string, { label: string; symbols: Sym[] }>;
 type Day = { pickDate: string; lockAt: string; locked: boolean };
 type Phase =
   | { kind: "loading" }
@@ -30,6 +31,9 @@ export function MyPicksPanel() {
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<Record<string, "saving" | "saved" | "error">>({});
   const [message, setMessage] = useState("");
+  // 2026-09-12: the universes are now the real indices (500+ symbols), so each market
+  // gets a search box instead of a row of buttons.
+  const [query, setQuery] = useState<Record<string, string>>({});
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -164,14 +168,36 @@ export function MyPicksPanel() {
                 {status[market] === "error" && <span className="text-rose-300">Not saved — try again</span>}
                 {!status[market] && picks[market] && <span className="text-gray-400">Your pick: {picks[market]}</span>}
               </p>
+              <label className="sr-only" htmlFor={`q-${market}`}>Search {u.label}</label>
+              <input
+                id={`q-${market}`}
+                type="search"
+                inputMode="search"
+                value={query[market] ?? ""}
+                onChange={(e) => setQuery((q) => ({ ...q, [market]: e.target.value }))}
+                placeholder={`Search ${u.symbols.length} symbols — ticker or company`}
+                className="mt-2 w-full rounded-md bg-black/40 px-3 py-3 text-white ring-1 ring-white/15"
+              />
               <div className="mt-2 flex flex-wrap gap-2">
-                {u.symbols.map((sym) => (
-                  <button key={sym} type="button" onClick={() => void choose(market, sym)} aria-pressed={picks[market] === sym}
-                    className={`min-h-[2.75rem] rounded-lg px-3 text-sm ring-1 ${picks[market] === sym ? "bg-sky-500/20 font-semibold text-white ring-2 ring-sky-400" : "text-gray-200 ring-white/15 active:bg-white/10"}`}>
-                    {sym}
-                  </button>
-                ))}
+                {(() => {
+                  const q = (query[market] ?? "").trim().toUpperCase();
+                  const matches = q
+                    ? u.symbols.filter((x) => x.symbol.includes(q) || (x.name ?? "").toUpperCase().includes(q)).slice(0, 24)
+                    : u.symbols.slice(0, 12);
+                  if (!matches.length) return <p className="text-sm text-gray-400">Nothing in {u.label} matches “{query[market]}”.</p>;
+                  return matches.map((x) => (
+                    <button key={x.symbol} type="button" onClick={() => void choose(market, x.symbol)} aria-pressed={picks[market] === x.symbol}
+                      title={x.name ?? x.symbol}
+                      className={`min-h-[2.75rem] rounded-lg px-3 text-sm ring-1 ${picks[market] === x.symbol ? "bg-sky-500/20 font-semibold text-white ring-2 ring-sky-400" : "text-gray-200 ring-white/15 active:bg-white/10"}`}>
+                      {x.symbol}
+                      {x.price !== null && <span className="ml-1 text-xs text-gray-400">{x.price < 10 ? x.price.toFixed(2) : Math.round(x.price)}</span>}
+                    </button>
+                  ));
+                })()}
               </div>
+              {!(query[market] ?? "").trim() && u.symbols.length > 12 && (
+                <p className="mt-1 text-xs text-gray-400">Showing 12 of {u.symbols.length}. Search to reach any of them.</p>
+              )}
             </fieldset>
           );
         })}

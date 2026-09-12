@@ -18,34 +18,21 @@ import { createHash } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStockPrices } from "@/lib/market/prices";
+import { getUniverse, universeTable, type UniverseRow } from "@/lib/market/universe";
 import { javariGenerate, javariResearch } from "@/lib/javari/door";
 
 /** The five markets. Every model picks once per market per day. 2026-09-12 */
+/**
+ * The five markets. Their constituents are no longer a list written here: each market's
+ * full universe is fetched daily (lib/market/universe.ts) so any constituent can be
+ * researched and chosen. 2026-09-12
+ */
 export const MARKETS = {
-  sp500: {
-    label: "S&P 500",
-    symbols: ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "JPM", "V",
-              "UNH", "XOM", "JNJ", "PG", "MA", "HD", "CVX", "LLY", "ABBV", "PEP", "KO", "COST"],
-  },
-  nasdaq: {
-    label: "Nasdaq 100",
-    symbols: ["NVDA", "AMD", "AVGO", "QCOM", "MU", "INTC", "AMAT", "ADBE", "CRM", "NFLX",
-              "PYPL", "SBUX", "BKNG", "ISRG", "PANW", "SNPS", "MRVL", "TEAM", "DDOG", "CRWD"],
-  },
-  dow: {
-    label: "Dow 30",
-    symbols: ["AAPL", "MSFT", "JPM", "V", "UNH", "HD", "PG", "JNJ", "CVX", "MRK",
-              "DIS", "CAT", "BA", "GS", "IBM", "MCD", "NKE", "TRV", "AXP", "HON"],
-  },
-  penny: {
-    label: "Penny stocks",
-    symbols: ["SOFI", "PLTR", "HOOD", "RIVN", "LCID", "NIO", "IONQ", "RKLB", "JOBY", "GRAB",
-              "OPEN", "DNA", "FCEL", "PLUG", "BBAI", "CHPT", "WULF", "CIFR"],
-  },
-  crypto: {
-    label: "Crypto",
-    symbols: ["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "LTC"],
-  },
+  sp500: { label: "S&P 500" },
+  nasdaq: { label: "Nasdaq 100" },
+  dow: { label: "Dow 30" },
+  penny: { label: "Penny stocks" },
+  crypto: { label: "Crypto" },
 } as const;
 
 export type MarketId = keyof typeof MARKETS;
@@ -74,13 +61,23 @@ async function cryptoPrices(symbols: readonly string[]): Promise<Map<string, num
   return out;
 }
 
-export async function pricesFor(market: MarketId): Promise<Map<string, number>> {
-  const symbols = MARKETS[market].symbols;
-  return market === "crypto" ? cryptoPrices(symbols) : getStockPrices([...symbols]);
+/** Today's prices for a market's whole universe. */
+export async function universePrices(db: Db, market: MarketId, snapshotDate: string): Promise<Map<string, number>> {
+  const rows = await getUniverse(db, market, snapshotDate);
+  const out = new Map<string, number>();
+  for (const r of rows) if (r.price !== null) out.set(r.symbol, r.price);
+  return out;
+}
+
+/** Live price for a handful of symbols - used at settlement, not for building a universe. */
+export async function pricesFor(market: MarketId, symbols?: string[]): Promise<Map<string, number>> {
+  if (market === "crypto") return cryptoPrices(symbols ?? ["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "LTC"]);
+  return getStockPrices(symbols ?? []);
 }
 
 /** Kept for callers that still expect the old single pool. */
-export const STOCK_POOL = [...MARKETS.sp500.symbols];
+/** Kept for older callers; the real universe now comes from getUniverse(). */
+export const STOCK_POOL: string[] = [];
 
 const PICK_PURPOSE = "market_pick";
 
@@ -167,11 +164,11 @@ export async function buildResearchPack(db: Db, pickDate: string, market: Market
     return { body: have.body as string, sources: src.success ? src.data : [], sha: have.sha256 as string };
   }
 
-  const lines: string[] = [`## ${MARKETS[market].label} - today's prices (you are choosing from these)`];
-  for (const sym of MARKETS[market].symbols) {
-    const p = prices.get(sym);
-    if (p !== undefined) lines.push(`- ${sym}: $${p.toFixed(2)}`);
-  }
+  const universe = await getUniverse(db, market, pickDate);
+  const lines: string[] = [
+    `## ${MARKETS[market].label} - the full universe you may choose from (${universe.length} symbols, price in USD)`,
+    universeTable(universe),
+  ];
 
   // 2026-09-12 (Roy): every model sees the FULL book - what every market is priced at
   // today, and the complete outcome history of the contest - so its decision rests on
@@ -179,9 +176,9 @@ export async function buildResearchPack(db: Db, pickDate: string, market: Market
   const others = MARKET_IDS.filter((m) => m !== market);
   for (const m of others) {
     try {
-      const p = await pricesFor(m);
-      if (p.size) lines.push("", `## ${MARKETS[m].label} - context only, not today's choices`,
-        [...p.entries()].map(([sym, v]) => `${sym} $${v < 10 ? v.toFixed(4) : v.toFixed(2)}`).join(" · "));
+      const rows = (await getUniverse(db, m, pickDate)).filter((r) => r.price !== null).slice(0, 25);
+      if (rows.length) lines.push("", `## ${MARKETS[m].label} - context only, not today's choices (largest names)`,
+        rows.map((r) => `${r.symbol} ${(r.price as number) < 10 ? (r.price as number).toFixed(4) : (r.price as number).toFixed(2)}`).join(" · "));
     } catch { /* a missing context market must not stop the pick */ }
   }
 
@@ -319,7 +316,7 @@ export async function runDailyBattle(db: Db, now: Date, markets: MarketId[] = MA
   for (const market of markets) {
   let prices: Map<string, number>;
   try {
-    prices = await pricesFor(market);
+    prices = await universePrices(db, market, pickDate);
   } catch (e) {
     report.errors.push(`${market} prices: ${e instanceof Error ? e.message : String(e)}`);
     continue;
@@ -331,7 +328,7 @@ export async function runDailyBattle(db: Db, now: Date, markets: MarketId[] = MA
   const benchSymbol = BENCHMARKS[market];
   let benchEntry: number | null = null;
   try {
-    const bench = benchSymbol === "BTC" ? await pricesFor("crypto") : await getStockPrices([benchSymbol]);
+    const bench = benchSymbol === "BTC" ? await pricesFor("crypto", ["BTC"]) : await getStockPrices([benchSymbol]);
     benchEntry = bench.get(benchSymbol) ?? null;
     if (benchEntry !== null) {
       const { error: bErr } = await db.from("market_benchmark_prices").upsert({ pick_date: pickDate, symbol: benchSymbol, price: benchEntry }, { onConflict: "pick_date,symbol" });
