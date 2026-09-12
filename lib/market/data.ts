@@ -127,7 +127,7 @@ export type BoardPick = Pick & { model: Model; rank: number; pilot: boolean; rec
 export type MarketBoard = { market: string; label: string; benchmark: string | null; picks: BoardPick[]; agreement: { symbol: string; count: number } | null; pilot: boolean };
 
 const MARKET_LABELS: Record<string, string> = {
-  sp500: "S&P 500", nasdaq: "Nasdaq 100", dow: "Dow 30", penny: "Penny stocks", crypto: "Crypto",
+  sp500: "S&P 500", nasdaq: "Nasdaq 100", dow: "Dow Composite 65", penny: "Penny stocks", crypto: "Crypto",
 };
 
 export async function getBoards(): Promise<{ pickDate: string | null; boards: MarketBoard[] }> {

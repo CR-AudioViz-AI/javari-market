@@ -30,7 +30,7 @@ import { javariGenerate, javariResearch } from "@/lib/javari/door";
 export const MARKETS = {
   sp500: { label: "S&P 500" },
   nasdaq: { label: "Nasdaq 100" },
-  dow: { label: "Dow 30" },
+  dow: { label: "Dow Composite 65" },
   penny: { label: "Penny stocks" },
   crypto: { label: "Crypto" },
 } as const;

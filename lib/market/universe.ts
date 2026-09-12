@@ -9,7 +9,8 @@
 //
 //   sp500   the S&P 500 constituents (Wikipedia's maintained list)
 //   nasdaq  the Nasdaq-100 (nasdaq.com's own index listing)
-//   dow     the Dow 30 (a constant - the index changes perhaps once a year, as news)
+//   dow     the Dow Jones Composite Average: industrials (30) + transports (20) +
+//           utilities (15) = 65 companies
 //   penny   every US listing under $5 with 300k+ volume and a market value over $50M
 //   crypto  the top 100 coins by market value, stablecoins excluded
 //
@@ -26,12 +27,28 @@ export type UniverseCategory = "sp500" | "nasdaq" | "dow" | "penny" | "crypto";
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; JavariMarketOracle/1.0; +https://javarimarket.com)" };
 
-/** The Dow 30. Verified 2026-09-12; the index changes rarely and always as public news. */
-const DOW_30 = [
+/**
+ * The Dow Jones Composite Average - the 65-stock index, not just the famous 30.
+ * Roy, 12 Sep 2026: "I wanted the larger Dow Jones index."
+ *
+ * It is the Industrial Average (30) plus the Transportation Average (20) plus the
+ * Utility Average (15). Verified 2026-09-12; membership changes rarely and always as
+ * public news, so it is a checked constant rather than a scrape that can break.
+ */
+const DOW_INDUSTRIALS = [
   "MMM", "AXP", "AMGN", "AMZN", "AAPL", "BA", "CAT", "CVX", "CSCO", "KO",
   "DIS", "GS", "HD", "HON", "IBM", "JNJ", "JPM", "MCD", "MRK", "MSFT",
   "NKE", "NVDA", "PG", "CRM", "SHW", "TRV", "UNH", "VZ", "V", "WMT",
 ];
+const DOW_TRANSPORTS = [
+  "ALK", "AAL", "CAR", "CHRW", "CSX", "DAL", "EXPD", "FDX", "JBHT", "JBLU",
+  "KEX", "LSTR", "MATX", "NSC", "ODFL", "R", "UAL", "UNP", "UPS", "XPO",
+];
+const DOW_UTILITIES = [
+  "AES", "LNT", "AEE", "AEP", "ATO", "ED", "D", "DUK", "EIX", "EXC",
+  "FE", "NEE", "PEG", "SRE", "XEL",
+];
+const DOW_65 = [...new Set([...DOW_INDUSTRIALS, ...DOW_TRANSPORTS, ...DOW_UTILITIES])];
 
 const PENNY_MAX_PRICE = 5;
 const PENNY_MIN_PRICE = 0.5;
@@ -237,7 +254,7 @@ export async function buildUniverse(category: UniverseCategory): Promise<Univers
   // Vercel's network, and an index universe must not depend on it - only the penny
   // screen, which genuinely needs to scan every listing, still does.
   if (category !== "penny") {
-    const members = category === "dow" ? DOW_30 : category === "nasdaq" ? await nasdaq100Symbols() : await sp500Symbols();
+    const members = category === "dow" ? DOW_65 : category === "nasdaq" ? await nasdaq100Symbols() : await sp500Symbols();
     const prices = await getStockPrices(members);
     return members
       .map((symbol) => ({ symbol, name: null, price: prices.get(symbol) ?? null, volume: null, marketCap: null }))
