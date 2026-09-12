@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           white headings rendered white-on-white and simply vanished. The shell owns the
           background now; dark panels sit on top of it unchanged. */}
       <body style={{ margin: 0, padding: 0, fontFamily: 'system-ui, sans-serif', background: '#05070b', color: '#e5e7eb', colorScheme: 'dark', minHeight: '100vh' }}>
-        <EmbedBridge />
+        <EmbedBridge brandedDomain="javarimarket.com" />
         {/* 2026-09-10: WCAG 2.4.1. Without this a keyboard user traverses the
             entire navigation on every page before reaching anything. Visually
             hidden until focused, which is the point - it is for people who are
