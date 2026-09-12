@@ -27,7 +27,7 @@ export default async function PennyStocks() {
         <p className="mt-1 text-sm text-gray-300">Contest picks trading under ${THRESHOLD} a share. Lower-priced shares move more sharply in both directions.</p>
         {!low.length ? (
           <div className="mt-5 rounded-xl border border-white/10 bg-[#111827] p-5">
-            <p className="text-sm text-gray-300">No pick under ${THRESHOLD} yet. <Link href="/" className="text-sky-300 underline">Today&rsquo;s picks</Link>.</p>
+            <p className="text-sm text-gray-300">No pick under ${THRESHOLD} yet. <Link href="/" className="inline-block py-2 text-sky-300 underline">Today&rsquo;s picks</Link>.</p>
           </div>
         ) : (
           <ul className="mt-5 space-y-2">

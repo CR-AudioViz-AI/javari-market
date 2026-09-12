@@ -39,7 +39,7 @@ export default async function Charts() {
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Charts</h1>
         <p className="mt-1 text-sm text-gray-300">Every figure comes from real predictions recorded before the outcome was known.</p>
         <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-          Hypothetical results, costs excluded. <Link href="/legal/performance" className="underline">Performance disclosure</Link>.
+          Hypothetical results, costs excluded. <Link href="/legal/performance" className="inline-block py-2 underline">Performance disclosure</Link>.
         </p>
 
         <section className="mt-6 rounded-xl border border-white/10 bg-[#111827] p-4">

@@ -31,12 +31,12 @@ export default async function Backtesting() {
         </p>
         <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
           Hypothetical results — no trades are placed and costs are excluded.{" "}
-          <Link href="/legal/performance" className="underline">Performance disclosure</Link>.
+          <Link href="/legal/performance" className="inline-block py-2 underline">Performance disclosure</Link>.
         </p>
 
         {!scored.length ? (
           <p className="mt-5 rounded-xl border border-white/10 bg-[#111827] p-5 text-sm text-gray-300">
-            No prediction has closed yet, so there is no record to show. Predictions run for seven days — see <Link href="/" className="text-sky-300 underline">today&rsquo;s picks</Link>.
+            No prediction has closed yet, so there is no record to show. Predictions run for seven days — see <Link href="/" className="inline-block py-2 text-sky-300 underline">today&rsquo;s picks</Link>.
           </p>
         ) : (
           <>

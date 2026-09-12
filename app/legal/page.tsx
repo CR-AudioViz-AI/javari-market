@@ -78,7 +78,7 @@ export default function LegalPage() {
 
         <Section id="past-performance" title="8. Hypothetical results, past performance and forward-looking statements">
           <p>Past performance is not indicative of future results. All predictions, targets, stop levels and projected returns are forward-looking statements that involve known and unknown risks. Actual results will differ, and may differ substantially.</p>
-          <p><strong className="text-white">Every result on this site is hypothetical.</strong> No trade is ever placed. Returns are measured from a recorded price to a later recorded price and exclude commissions, bid-ask spread, slippage, the price impact of trading, financing costs, dividends and taxes. They are not the returns of any actual portfolio and could not have been obtained by any investor. See our <Link href="/legal/performance" className="text-sky-300 underline">performance disclosure</Link>.</p>
+          <p><strong className="text-white">Every result on this site is hypothetical.</strong> No trade is ever placed. Returns are measured from a recorded price to a later recorded price and exclude commissions, bid-ask spread, slippage, the price impact of trading, financing costs, dividends and taxes. They are not the returns of any actual portfolio and could not have been obtained by any investor. See our <Link href="/legal/performance" className="inline-block py-2 text-sky-300 underline">performance disclosure</Link>.</p>
         </Section>
 
         <Section id="data" title="9. Market data and third-party sources">
@@ -124,7 +124,7 @@ export default function LegalPage() {
         </Section>
 
         <Section id="contact" title="19. Contact">
-          <p>CR AudioViz AI, LLC · EIN 39-3646201 · Fort Myers, Florida · <a className="text-sky-300 underline" href="https://craudiovizai.com">craudiovizai.com</a></p>
+          <p>CR AudioViz AI, LLC · EIN 39-3646201 · Fort Myers, Florida · <a className="inline-block py-2 text-sky-300 underline" href="https://craudiovizai.com">craudiovizai.com</a></p>
         </Section>
 
         <p className="mt-10 text-sm"><Link href="/how-it-works" className="inline-flex min-h-[2.75rem] items-center text-sky-300 underline">How the contest works →</Link></p>

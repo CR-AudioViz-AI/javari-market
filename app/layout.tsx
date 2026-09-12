@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* One line on a phone: the brand truncates, the EIN is desktop-only. It used to
             wrap to three lines and push the page down. */}
         <div data-app-chrome style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)', padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 44, position: 'relative', zIndex: 200 }}>
-          <a href="https://craudiovizai.com" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, textDecoration: 'none', color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <a href="https://craudiovizai.com" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, textDecoration: 'none', color: '#fff', fontSize: 13, fontWeight: 600, minHeight: 44, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             <span aria-hidden>📈</span>
             <span style={{ color: '#38bdf8' }}>Javari Market Oracle</span>
             <span className="hidden sm:inline" style={{ color: '#4b5563', fontSize: 11 }}>· CR AudioViz AI · EIN 39-3646201</span>
@@ -52,9 +52,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer data-app-chrome style={{ background: '#050608', borderTop: '1px solid rgba(255,255,255,0.05)', padding: '16px 24px', textAlign: 'center' }}>
           <p style={{ color: '#1f2937', fontSize: 11, margin: 0, fontFamily: 'system-ui' }}>
             © 2026 CR AudioViz AI, LLC — EIN: 39-3646201 · Fort Myers, Florida · Your Story. Our Design. ·{' '}
-            <a href="https://craudiovizai.com" style={{ color: '#374151', textDecoration: 'none' }}>craudiovizai.com</a>
+            <a href="https://craudiovizai.com" style={{ color: '#6b7280', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 8px' }}>craudiovizai.com</a>
             {' '}·{' '}
-            <a href="https://craudiovizai.com/auth/signup" style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>Sign Up Free</a>
+            <a href="https://craudiovizai.com/auth/signup" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 8px' }}>Sign Up Free</a>
           </p>
         </footer>
       </body>
