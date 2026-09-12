@@ -19,6 +19,7 @@
 // CR AudioViz AI, LLC · EIN 39-3646201
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getStockPrices } from "@/lib/market/prices";
 
 export type UniverseRow = { symbol: string; name: string | null; price: number | null; volume: number | null; marketCap: number | null };
 export type UniverseCategory = "sp500" | "nasdaq" | "dow" | "penny" | "crypto";
@@ -55,7 +56,7 @@ const SCREENER_TTL_MS = 30 * 60_000;
 async function screener(): Promise<Map<string, UniverseRow>> {
   if (screenerCache && Date.now() - screenerCache.at < SCREENER_TTL_MS) return screenerCache.rows;
   const res = await fetch("https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&download=true", {
-    headers: UA, cache: "no-store", signal: AbortSignal.timeout(45_000),
+    headers: UA, cache: "no-store", signal: AbortSignal.timeout(120_000),
   });
   if (!res.ok) throw new Error(`Nasdaq screener HTTP ${res.status}`);
   const json = (await res.json()) as { data?: { rows?: ScreenerRow[] } };
@@ -115,17 +116,26 @@ async function cryptoTop100(): Promise<UniverseRow[]> {
 
 export async function buildUniverse(category: UniverseCategory): Promise<UniverseRow[]> {
   if (category === "crypto") return cryptoTop100();
+
+  // 2026-09-12: the index universes are priced with the same Yahoo batch feed the rest
+  // of the app uses. The Nasdaq screener works from a desktop but times out from
+  // Vercel's network, and an index universe must not depend on it - only the penny
+  // screen, which genuinely needs to scan every listing, still does.
+  if (category !== "penny") {
+    const members = category === "dow" ? DOW_30 : category === "nasdaq" ? await nasdaq100Symbols() : await sp500Symbols();
+    const prices = await getStockPrices(members);
+    return members
+      .map((symbol) => ({ symbol, name: null, price: prices.get(symbol) ?? null, volume: null, marketCap: null }))
+      .filter((r) => r.price !== null);
+  }
+
   const all = await screener();
-  if (category === "penny") {
+  {
     return [...all.values()]
       .filter((r) => r.price !== null && r.price >= PENNY_MIN_PRICE && r.price <= PENNY_MAX_PRICE
         && (r.volume ?? 0) >= PENNY_MIN_VOLUME && (r.marketCap ?? 0) >= PENNY_MIN_MARKET_CAP)
       .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
   }
-  const members = category === "dow" ? DOW_30 : category === "nasdaq" ? await nasdaq100Symbols() : await sp500Symbols();
-  return members
-    .map((symbol) => all.get(symbol) ?? { symbol, name: null, price: null, volume: null, marketCap: null })
-    .filter((r) => r.price !== null);
 }
 
 /** Today's snapshot, built on first use and reused all day. */
