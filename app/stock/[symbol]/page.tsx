@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -134,11 +134,14 @@ function getSentimentColor(sentiment: string): string {
   }
 }
 
-export default function StockIntelligencePage({ 
-  params 
-}: { 
-  params: { symbol: string } 
+// 2026-09-12: Next 16 passes params as a Promise. In a client component the hook `use()`
+// unwraps it; reading routeSymbol directly gave undefined and the page loaded nothing.
+export default function StockIntelligencePage({
+  params
+}: {
+  params: Promise<{ symbol: string }>
 }) {
+  const { symbol: routeSymbol } = use(params);
   const [data, setData] = useState<StockData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,8 +165,8 @@ export default function StockIntelligencePage({
   };
 
   useEffect(() => {
-    fetchData(params.symbol);
-  }, [params.symbol]);
+    fetchData(routeSymbol);
+  }, [routeSymbol]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

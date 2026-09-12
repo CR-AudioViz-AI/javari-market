@@ -25,9 +25,13 @@ const pct = (n: number | null): string => (n === null ? "—" : `${n >= 0 ? "+" 
 const money = (n: number | null): string => (n === null ? "—" : n >= 1000 ? `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : n < 1 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
 const tone = (n: number | null): string => (n === null ? "text-gray-300" : n >= 0 ? "text-emerald-400" : "text-rose-400");
 
-export default async function SymbolResearch({ params }: { params: { market: string; symbol: string } }) {
-  const market = params.market;
-  const symbol = decodeURIComponent(params.symbol).toUpperCase();
+// 2026-09-12: Next 16 hands route params (and searchParams) to a page as a PROMISE.
+// Reading params.market synchronously gave undefined, so every research URL 404'd even
+// though the route matched. This app is on Next 16; the NFL app is on 14, where the old
+// synchronous form is correct - which is why the same code worked there.
+export default async function SymbolResearch({ params }: { params: Promise<{ market: string; symbol: string }> }) {
+  const { market, symbol: rawSymbol } = await params;
+  const symbol = decodeURIComponent(rawSymbol).toUpperCase();
   if (!LABELS[market] || !/^[A-Z0-9.\-]{1,10}$/.test(symbol)) notFound();
 
   const url = supabaseUrl();

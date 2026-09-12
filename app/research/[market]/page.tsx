@@ -18,8 +18,12 @@ const LABELS: Record<string, string> = {
   sp500: "S&P 500", nasdaq: "Nasdaq 100", dow: "Dow Composite 65", penny: "Penny stocks", crypto: "Crypto",
 };
 
-export default async function MarketResearch({ params }: { params: { market: string } }) {
-  const market = params.market;
+// 2026-09-12: Next 16 hands route params (and searchParams) to a page as a PROMISE.
+// Reading params.market synchronously gave undefined, so every research URL 404'd even
+// though the route matched. This app is on Next 16; the NFL app is on 14, where the old
+// synchronous form is correct - which is why the same code worked there.
+export default async function MarketResearch({ params }: { params: Promise<{ market: string }> }) {
+  const { market } = await params;
   if (!LABELS[market]) notFound();
   const url = supabaseUrl();
   const key = secretKey();

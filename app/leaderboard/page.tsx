@@ -13,8 +13,11 @@ export const dynamic = "force-dynamic";
 
 const pct = (n: number | null, digits = 2): string => (n === null ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`);
 
-export default async function Leaderboard({ searchParams }: { searchParams: { week?: string } }) {
-  const { competitors, qualifying } = await getCompetition(searchParams.week ? { weekStart: searchParams.week } : {});
+// 2026-09-12: Next 16 passes searchParams as a Promise; reading .week synchronously gave
+// undefined, so ?week=... silently showed the all-time table instead of that week.
+export default async function Leaderboard({ searchParams }: { searchParams: Promise<{ week?: string }> }) {
+  const { week } = await searchParams;
+  const { competitors, qualifying } = await getCompetition(week ? { weekStart: week } : {});
   const ranked = competitors.filter((c) => c.qualified);
   const waiting = competitors.filter((c) => !c.qualified);
   const people = competitors.filter((c) => c.kind === "person").length;
