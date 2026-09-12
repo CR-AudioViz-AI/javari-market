@@ -56,9 +56,30 @@ export function weekStart(dateStr: string): string {
 }
 
 /** The current trading day row, created on first use with its 09:30 ET lock. */
+/** The next Eastern weekday on or after a date (markets are shut at weekends). */
+function nextWeekday(dateStr: string): string {
+  const dt = new Date(`${dateStr}T12:00:00Z`);
+  while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6) dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * The session a player is currently picking for.
+ *
+ * 2026-09-12: this used to be "today", so from 9:30 AM ET onwards the page was locked
+ * and nobody could enter anything until the next morning - including all evening and
+ * all weekend. Once a session's lock passes, picking rolls forward to the next trading
+ * day, which is what a player expects: you can always put tomorrow's picks in.
+ */
 export async function currentDay(now = new Date()): Promise<{ pickDate: string; lockAt: string; locked: boolean; weekStart: string }> {
   const d = db();
-  const pickDate = etDate(now);
+  const today = etDate(now);
+  let pickDate = nextWeekday(today);
+  if (pickDate === today && now.getTime() >= etInstant(today, 9, 30).getTime()) {
+    const tomorrow = new Date(`${today}T12:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    pickDate = nextWeekday(tomorrow.toISOString().slice(0, 10));
+  }
   const { data: have, error } = await d.from("market_days").select("*").eq("pick_date", pickDate).maybeSingle();
   if (error) throw new Error(`day: ${error.message}`);
   if (have) {
