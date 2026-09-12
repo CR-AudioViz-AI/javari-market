@@ -1,9 +1,14 @@
 // lib/learning/javari-consensus.ts
+// 2026-09-12: this module queried the market_oracle_* tables, which were dropped with
+// the retired pick system. It now reads the live contest data in stock_picks / ai_models.
+// Column names differ: a pick's model is ai_model_id (not ai_model), its result is
+// status/result with profit_loss_percent (not PENDING/WIN/LOSS with actual_return).
 // Market Oracle Ultimate - Javari AI Consensus System
 // Created: December 13, 2025
 // Updated: December 13, 2025 - Fixed PickOutcome type casting
 // Purpose: Meta-learning system that learns which AI combinations to trust
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { 
   AIModelName, 
   PickDirection, 
@@ -16,8 +21,8 @@ import { getLatestCalibration } from './calibration-engine';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
-function getSupabase() {
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
   // 2026-08-19: this function was CORRUPTED in 27 files, byte-identically.
   // `return _supabase;` had been spliced into the middle of the options object:
   //
@@ -25,7 +30,7 @@ function getSupabase() {
   //   } })
   //
   // The repo did not compile - 102 type errors across 29 files - and every route
-  // using it threw "supabase is not defined". javarimarket.com kept serving only
+  // using it threw "getSupabase() is not defined". javarimarket.com kept serving only
   // because Vercel holds the last successful build; the next push would have
   // failed and stayed failed.
   //
@@ -35,11 +40,12 @@ function getSupabase() {
   const sb = require('@supabase/supabase-js');
   const url = supabaseUrl();
   const key = secretKey();
-  if (!url || !key) return null;
+  if (!url || !key) throw new Error('Supabase credentials unavailable');
   _supabase = sb.createClient(url, key, {
     auth: { persistSession: false },
     global: { fetch: (u: RequestInfo | URL, o?: RequestInit) => fetch(u, { ...o, cache: 'no-store' }) },
   });
+  if (!_supabase) throw new Error('Supabase client unavailable');
   return _supabase;
 }
 
@@ -206,7 +212,7 @@ async function getConsensusHistoricalPerformance(
   try {
     const comboKey = aiCombination.sort().join(',');
     
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('market_oracle_consensus_stats')
       .select('*')
       .eq('ai_combination_key', comboKey)
@@ -241,8 +247,8 @@ async function findSimilarPastSetups(
 ): Promise<{ setupId: string; outcome: PickOutcome; similarity: number }[]> {
   try {
     // Get past consensus picks with same symbol or sector
-    const { data: pastPicks, error } = await supabase
-      .from('market_oracle_consensus_picks')
+    const { data: pastPicks, error } = await getSupabase()
+      .from('stock_picks')
       .select('*')
       .eq('direction', direction)
       .in('status', ['WIN', 'LOSS'])
@@ -299,8 +305,8 @@ async function storeConsensusForLearning(
   aiCombination: AIModelName[]
 ): Promise<void> {
   try {
-    const { error } = await supabase
-      .from('market_oracle_consensus_picks')
+    const { error } = await getSupabase()
+      .from('stock_picks')
       .insert({
         symbol: assessment.symbol,
         direction: assessment.consensusDirection,
@@ -333,8 +339,8 @@ export async function updateConsensusPerformance(
 ): Promise<void> {
   try {
     // Get the consensus pick
-    const { data: pick, error: pickError } = await supabase
-      .from('market_oracle_consensus_picks')
+    const { data: pick, error: pickError } = await getSupabase()
+      .from('stock_picks')
       .select('*')
       .eq('id', consensusPickId)
       .single();
@@ -345,8 +351,8 @@ export async function updateConsensusPerformance(
     }
 
     // Update the pick status
-    await supabase
-      .from('market_oracle_consensus_picks')
+    await getSupabase()
+      .from('stock_picks')
       .update({
         status: outcome,
         actual_return: actualReturn,
@@ -358,7 +364,7 @@ export async function updateConsensusPerformance(
     const comboKey = pick.ai_combination_key;
     
     // Get or create stats record
-    const { data: stats, error: statsError } = await supabase
+    const { data: stats, error: statsError } = await getSupabase()
       .from('market_oracle_consensus_stats')
       .select('*')
       .eq('ai_combination_key', comboKey)
@@ -372,7 +378,7 @@ export async function updateConsensusPerformance(
 
     if (!stats) {
       // Create new stats record
-      await supabase
+      await getSupabase()
         .from('market_oracle_consensus_stats')
         .insert({
           ai_combination: pick.ai_combination,
@@ -393,7 +399,7 @@ export async function updateConsensusPerformance(
       const newLosses = stats.losses + (outcome === 'LOSS' ? 1 : 0);
       const newTotalReturn = stats.total_return + actualReturn;
       
-      await supabase
+      await getSupabase()
         .from('market_oracle_consensus_stats')
         .update({
           times_agreed: newTimesAgreed,
@@ -421,7 +427,7 @@ export async function getTopAICombinations(
   minSamples: number = 10
 ): Promise<JavariConsensusStats[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('market_oracle_consensus_stats')
       .select('*')
       .gte('times_agreed', minSamples)
@@ -460,7 +466,7 @@ export async function generateJavariWeeklyReport(): Promise<{
 }> {
   try {
     // Get all consensus stats
-    const { data: consensusData, error } = await supabase
+    const { data: consensusData, error } = await getSupabase()
       .from('market_oracle_consensus_stats')
       .select('*')
       .gte('times_agreed', 5)

@@ -3,7 +3,7 @@
 // Created: December 12, 2025 - Roy Henderson / CR AudioViz AI
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 export const dynamic = 'force-dynamic';
@@ -22,8 +22,8 @@ export const dynamic = 'force-dynamic';
 // probing 140 live endpoints on 2026-08-19, not by reading code.
 //
 // Rewritten to cache properly, which is what the _supabase variable was always for.
-let _supabase: ReturnType<typeof createClient> | null = null;
-function getSupabase(): ReturnType<typeof createClient> | null {
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
   if (_supabase) return _supabase;
   const url = supabaseUrl();
   const key = secretKey();
@@ -190,7 +190,7 @@ async function getChallengeStatus(userId: string | null) {
     .single();
   
   // Get leaderboard position
-  let leaderboardPosition = null;
+  let leaderboardPosition: number | null = null;
   if (activeChallenge) {
     const { count } = await supabase
       .from('challenge_enrollments')

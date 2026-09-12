@@ -63,7 +63,7 @@ export async function GET(request: Request) {
     
     console.log(`📊 Found ${picks.length} picks to update`)
     
-    const updates = []
+    const updates: Array<Record<string, unknown>> = []
     let successCount = 0
     let failCount = 0
     
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Symbols array required' }, { status: 400 })
     }
     
-    const updates = []
+    const updates: Array<Record<string, unknown>> = []
     
     for (const symbol of symbols) {
       const currentPrice = await fetchStockPrice(symbol)

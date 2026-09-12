@@ -1,5 +1,11 @@
 'use client';
 
+const EXAMPLES = [
+  'The Fed cuts rates by 50 basis points',
+  'NVIDIA misses earnings expectations',
+  'Oil rises above $120 a barrel',
+];
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { Zap, TrendingUp, TrendingDown, Loader2, BarChart3, Building2, AlertTriangle, Play } from 'lucide-react';
@@ -77,6 +83,16 @@ export default function SimulatorPage() {
               placeholder="E.g., Apple announces $100B stock buyback, China bans iPhone sales..."
               className="w-full px-4 py-4 bg-gray-900/50 border border-gray-700 rounded-xl focus:border-orange-500 focus:outline-none" />
           </div>
+            {/* 2026-09-12: opened as an empty box with no way in. */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-gray-400">Try one:</span>
+              {EXAMPLES.map((ex) => (
+                <button key={ex} type="button" onClick={() => setCustomScenario(ex)}
+                  className="inline-flex min-h-[2.75rem] items-center rounded-lg px-3 text-left text-sm text-gray-200 ring-1 ring-white/15 hover:bg-white/5">
+                  {ex}
+                </button>
+              ))}
+            </div>
 
           {/* Run Button */}
           <button onClick={runSimulation} disabled={loading || (!selectedScenario && !customScenario)}

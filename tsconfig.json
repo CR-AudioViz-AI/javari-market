@@ -1,19 +1,4 @@
 {
-  // 2026-09-03: strict and target corrected.
-  //
-  // These two defects travel together and both were fixed across 46 repos in the
-  // August fleet pass. This repo was not in that pass - the sweep covered repos
-  // linked to a Vercel project at the time, and this one was added since. The fix
-  // had a coverage gap defined by a snapshot, which is how a fleet-wide correction
-  // leaves survivors.
-  //
-  // strict:false stops the compiler narrowing a discriminated union, so a correct
-  // auth guard - if (!auth.ok) return auth.res - is REJECTED. javari-business
-  // failed its production build on exactly that today.
-  //
-  // target es5/es2017 is why [...new Set(...)] does not compile, which broke
-  // lender deduplication in mortgage-rate-monitor and rescue-owner deduplication
-  // in javari-animal-rescue.
   "compilerOptions": {
     "target": "ES2020",
     "lib": [
@@ -54,10 +39,13 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "e2e",
     "**/*.spec.ts",
     "**/*.test.ts",
-    ".next"
+    ".next",
+    "e2e",
+    "e2e/**",
+    "node_modules",
+    "playwright.config.ts",
+    "tests/**"
   ]
 }

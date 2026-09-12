@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
+let _supabase: SupabaseClient | null = null;
 function getSupabase() {
   // 2026-08-19: this function was CORRUPTED in 27 files, byte-identically.
   // `return _supabase;` had been spliced into the middle of the options object:

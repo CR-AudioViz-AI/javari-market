@@ -29,5 +29,14 @@ const nextConfig={
   // 2026-08-29: required for @craudioviz/platform-sdk. The SDK ships raw
   // TypeScript and Next does not run node_modules through SWC by default, so
   // any import carrying a `type` re-export fails the build without this.
-  transpilePackages: ["@craudioviz/platform-sdk"],typescript:{ignoreBuildErrors:true},eslint:{ignoreDuringBuilds:true},reactStrictMode:false}
+  transpilePackages: ["@craudioviz/platform-sdk"],
+  // 2026-09-12: typescript.ignoreBuildErrors was true, so the build shipped whatever
+  // compiled. Behind it sat 282 real type errors - a module whose Supabase client was a
+  // syntax error, pages typed against a row shape that never existed, a route calling a
+  // two-argument function with one array. The repo now type-checks clean, so the gate
+  // goes back on: a type error fails the build instead of reaching production.
+  typescript: { ignoreBuildErrors: false },
+  eslint: { ignoreDuringBuilds: true },
+  reactStrictMode: false,
+}
 module.exports=nextConfig

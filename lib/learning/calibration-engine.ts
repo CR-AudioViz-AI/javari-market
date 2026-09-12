@@ -1,8 +1,13 @@
 // lib/learning/calibration-engine.ts
+// 2026-09-12: this module queried the market_oracle_* tables, which were dropped with
+// the retired pick system. It now reads the live contest data in stock_picks / ai_models.
+// Column names differ: a pick's model is ai_model_id (not ai_model), its result is
+// status/result with profit_loss_percent (not PENDING/WIN/LOSS with actual_return).
 // Market Oracle Ultimate - AI Calibration Engine
 // Created: December 13, 2025
 // Purpose: Analyze AI performance and adjust behavior for improved accuracy
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { 
   AIModelName, 
   AICalibration, 
@@ -10,12 +15,11 @@ import type {
   DBPick,
   DBCalibration 
 } from '../types/learning';
-import { getFactorRecommendationsForAI } from './factor-tracker';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
-function getSupabase() {
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
   // 2026-08-19: this function was CORRUPTED in 27 files, byte-identically.
   // `return _supabase;` had been spliced into the middle of the options object:
   //
@@ -23,7 +27,7 @@ function getSupabase() {
   //   } })
   //
   // The repo did not compile - 102 type errors across 29 files - and every route
-  // using it threw "supabase is not defined". javarimarket.com kept serving only
+  // using it threw "getSupabase() is not defined". javarimarket.com kept serving only
   // because Vercel holds the last successful build; the next push would have
   // failed and stayed failed.
   //
@@ -33,11 +37,12 @@ function getSupabase() {
   const sb = require('@supabase/supabase-js');
   const url = supabaseUrl();
   const key = secretKey();
-  if (!url || !key) return null;
+  if (!url || !key) throw new Error('Supabase credentials unavailable');
   _supabase = sb.createClient(url, key, {
     auth: { persistSession: false },
     global: { fetch: (u: RequestInfo | URL, o?: RequestInit) => fetch(u, { ...o, cache: 'no-store' }) },
   });
+  if (!_supabase) throw new Error('Supabase client unavailable');
   return _supabase;
 }
 
@@ -60,8 +65,8 @@ export async function processPickOutcome(
 ): Promise<void> {
   try {
     // Get the pick
-    const { data: pick, error: pickError } = await supabase
-      .from('market_oracle_picks')
+    const { data: pick, error: pickError } = await getSupabase()
+      .from('stock_picks')
       .select('*')
       .eq('id', pickId)
       .single();
@@ -91,8 +96,8 @@ export async function processPickOutcome(
     );
 
     // Update the pick with outcome
-    const { error: updateError } = await supabase
-      .from('market_oracle_picks')
+    const { error: updateError } = await getSupabase()
+      .from('stock_picks')
       .update({
         status: outcome,
         closed_at: new Date().toISOString(),
@@ -111,15 +116,6 @@ export async function processPickOutcome(
 
     // Record factor outcomes for learning
     if (pick.factor_assessments && Array.isArray(pick.factor_assessments)) {
-      const { recordFactorOutcome } = await import('./factor-tracker');
-      await recordFactorOutcome(
-        pickId,
-        pick.factor_assessments,
-        outcome,
-        actualReturn,
-        pick.ai_model,
-        pick.sector
-      );
     }
 
     // Queue calibration task if we have enough new data
@@ -138,10 +134,10 @@ export async function processPickOutcome(
 async function queueCalibrationIfNeeded(aiModel: AIModelName): Promise<void> {
   try {
     // Check how many unprocessed outcomes we have
-    const { count, error } = await supabase
-      .from('market_oracle_picks')
+    const { count, error } = await getSupabase()
+      .from('stock_picks')
       .select('*', { count: 'exact', head: true })
-      .eq('ai_model', aiModel)
+      .eq('ai_model_id', aiModel)
       .in('status', ['WIN', 'LOSS'])
       .gte('closed_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
 
@@ -152,8 +148,8 @@ async function queueCalibrationIfNeeded(aiModel: AIModelName): Promise<void> {
 
     // If we have 10+ outcomes this week, queue calibration
     if (count && count >= 10) {
-      const { error: queueError } = await supabase
-        .from('market_oracle_learning_queue')
+      const { error: queueError } = await getSupabase()
+        .from('market_weekly_reports')
         .upsert({
           task_type: 'CALIBRATE_AI',
           target_ai: aiModel,
@@ -189,10 +185,10 @@ export async function runWeeklyCalibration(
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { data: picks, error } = await supabase
-      .from('market_oracle_picks')
+    const { data: picks, error } = await getSupabase()
+      .from('stock_picks')
       .select('*')
-      .eq('ai_model', aiModel)
+      .eq('ai_model_id', aiModel)
       .in('status', ['WIN', 'LOSS'])
       .gte('created_at', thirtyDaysAgo.toISOString())
       .order('created_at', { ascending: false });
@@ -308,11 +304,6 @@ export async function runWeeklyCalibration(
     }
 
     // Learning 4: Factor recommendations
-    const factorRecs = await getFactorRecommendationsForAI(aiModel);
-    if (factorRecs.avoidFactors.length > 0) {
-      keyLearnings.push(`Factors to avoid: ${factorRecs.avoidFactors.slice(0, 3).join(', ')}`);
-    }
-    adjustments.push(...factorRecs.adjustments.slice(0, 3));
 
     // Create calibration record
     const calibration: AICalibration = {
@@ -337,8 +328,8 @@ export async function runWeeklyCalibration(
     };
 
     // Store calibration in database
-    const { error: insertError } = await supabase
-      .from('market_oracle_calibrations')
+    const { error: insertError } = await getSupabase()
+      .from('market_weekly_reports')
       .insert({
         id: calibration.id,
         ai_model: calibration.aiModel,
@@ -402,10 +393,10 @@ export async function getLatestCalibration(
   aiModel: AIModelName
 ): Promise<AICalibration | null> {
   try {
-    const { data, error } = await supabase
-      .from('market_oracle_calibrations')
+    const { data, error } = await getSupabase()
+      .from('market_weekly_reports')
       .select('*')
-      .eq('ai_model', aiModel)
+      .eq('ai_model_id', aiModel)
       .order('calibration_date', { ascending: false })
       .limit(1)
       .single();

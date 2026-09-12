@@ -14,7 +14,7 @@ export const maxDuration = 300;
 
 // Lazy Supabase client — initialized on first request (not at module load time)
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-// Typed as the plain client: without a Database generic, ReturnType<typeof createClient>
+// Typed as the plain client: without a Database generic, SupabaseClient
 // resolved every row to `never`, so nothing in this file type-checked (the build hides
 // this with ignoreBuildErrors).
 let _supabase: SupabaseClient | null = null;

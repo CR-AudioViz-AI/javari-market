@@ -64,7 +64,7 @@ export async function GET() {
     (diagnostics.tests as Record<string, unknown>).getOverallStats = {
       success: true,
       totalPicks: stats.totalPicks,
-      activePicks: stats.activePicks,
+      activeModels: stats.activeModels,
     };
   } catch (e: unknown) {
     (diagnostics.tests as Record<string, unknown>).getOverallStats = { success: false, error: String(e) };

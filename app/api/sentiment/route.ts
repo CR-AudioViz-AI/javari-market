@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/sentiment/route.ts
 // Twitter/X Sentiment Analysis API for Market Oracle
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
+let _supabase: SupabaseClient | null = null;
 function getSupabase() {
   // 2026-08-19: this function was CORRUPTED in 27 files, byte-identically.
   // `return _supabase;` had been spliced into the middle of the options object:
@@ -70,8 +71,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, data })
       }
       case 'compare': {
-        const symbols = searchParams.get('symbols')?.split(',') || []
-        const data = await compareSentiment(symbols)
+        // 2026-09-12: compareSentiment(symbol1, symbol2) - it was called with an array,
+        // so this branch could never have worked.
+        const symbols = searchParams.get('symbols')?.split(',').map((x) => x.trim()).filter(Boolean) || []
+        if (symbols.length < 2) {
+          return NextResponse.json({ success: false, error: 'Pass two symbols, e.g. ?symbols=AAPL,MSFT' }, { status: 400 })
+        }
+        const data = await compareSentiment(symbols[0] as string, symbols[1] as string)
         return NextResponse.json({ success: true, data })
       }
       case 'context': {

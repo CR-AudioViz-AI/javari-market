@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { rateLimit } from '@/lib/api/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { secretKey, publishableKey, supabaseUrl } from "@craudioviz/platform-sdk";
@@ -5,7 +6,7 @@ import { secretKey, publishableKey, supabaseUrl } from "@craudioviz/platform-sdk
 export const dynamic = "force-dynamic";
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
+let _supabase: SupabaseClient | null = null;
 function getSupabase() {
   // 2026-08-19: this function was CORRUPTED in 27 files, byte-identically.
   // `return _supabase;` had been spliced into the middle of the options object:

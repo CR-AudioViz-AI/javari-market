@@ -2,6 +2,7 @@
 // Runs daily at market open to generate AI picks automatically
 // Triggered by Vercel cron: weekdays at 9:35 AM ET
 // CR AudioViz AI · May 2026
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from 'next/server'
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,7 @@ const GROQ = process.env.GROQ_API_KEY || ''
 const OR = process.env.OPENROUTER_API_KEY || ''
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
+let _supabase: SupabaseClient | null = null;
 function getSupabase() {
   // 2026-08-19: `return _supabase;` had been spliced INTO the destructuring
   // pattern - `const { createClient   return _supabase;\n} = require(...)`.

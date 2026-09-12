@@ -12,7 +12,7 @@ import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 export const dynamic = "force-dynamic";
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-// 2026-09-11: was ReturnType<typeof createClient> with no createClient imported (it is
+// 2026-09-11: was SupabaseClient with no createClient imported (it is
 // require()d at runtime), so this file never type-checked.
 let _supabase: SupabaseClient | null = null;
 function getSupabase() {

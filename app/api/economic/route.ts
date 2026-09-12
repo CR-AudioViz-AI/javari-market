@@ -171,7 +171,7 @@ export async function GET(request: Request) {
     }
     
     // Key highlights
-    const highlights = [];
+    const highlights: { title: string; value: string; insight: string; impact: string }[] = [];
     
     // Fed Funds Rate
     const fedFunds = indicators.find(i => i.id === 'FEDFUNDS');

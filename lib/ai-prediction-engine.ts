@@ -3,13 +3,13 @@
 // 15 Picks per AI: 5 Regular, 5 Penny, 5 Crypto
 // ============================================
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
-function getSupabase() {
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
   if (!_supabase) {
     const url = supabaseUrl();
     const key = secretKey();
@@ -19,6 +19,7 @@ function getSupabase() {
     if (!url || !key) throw new Error("Supabase credentials unavailable");
     _supabase = createClient(url, key);
   }
+  if (!_supabase) throw new Error('Supabase client unavailable');
   return _supabase;
 }
 // Types
@@ -311,7 +312,7 @@ export interface GenerationResult {
 }
 
 export async function generateAllPicks(competitionId: string, weekNumber: number): Promise<GenerationResult> {
-  const supabase = getSupabase()!
+  const db = getSupabase()!
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -329,7 +330,7 @@ export async function generateAllPicks(competitionId: string, weekNumber: number
   ];
   
   // Get AI model IDs from database
-  const { data: aiModels } = await supabase
+  const { data: aiModels } = await getSupabase()
     .from('ai_models')
     .select('id, name')
     .eq('is_active', true);
@@ -374,7 +375,7 @@ export async function generateAllPicks(competitionId: string, weekNumber: number
         
         // Save picks to database
         for (const pick of picks) {
-          const { error } = await supabase.from('stock_picks').insert({
+          const { error } = await getSupabase().from('stock_picks').insert({
             competition_id: competitionId,
             ai_model_id: ai.modelId,
             ticker: pick.ticker,
@@ -435,15 +436,15 @@ export async function updatePricesAndScore(): Promise<{
   losers: number;
   errors: string[];
 }> {
-  // 2026-08-19: `const supabase = getSupabase()!` had been spliced INTO the
+  // 2026-08-19: `const db = getSupabase()!` had been spliced INTO the
   // return type annotation, between Promise<{ and the first property. Same
   // corruption as 29 sibling files in this repo, landing at a different point
   // each time. It belongs in the body.
-  const supabase = getSupabase()!;
+  const db = getSupabase()!;
   const result = { updated: 0, winners: 0, losers: 0, errors: [] as string[] };
   
   // Get active picks
-  const { data: activePicks, error } = await supabase
+  const { data: activePicks, error } = await getSupabase()
     .from('stock_picks')
     .select('*')
     .eq('status', 'active');
@@ -543,7 +544,7 @@ async function updatePickWithPrice(
     ? currentPrice - pick.entry_price
     : pick.entry_price - currentPrice;
   
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('stock_picks')
     .update({
       current_price: currentPrice,

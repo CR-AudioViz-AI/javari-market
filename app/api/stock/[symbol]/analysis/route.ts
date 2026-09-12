@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/stock/[symbol]/analysis/route.ts
 // Market Oracle - Self-Contained Stock Analysis API
@@ -10,7 +11,7 @@ import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 export const dynamic = 'force-dynamic';
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
+let _supabase: SupabaseClient | null = null;
 function getSupabase() {
   // 2026-08-19: this function was CORRUPTED in 27 files, byte-identically.
   // `return _supabase;` had been spliced into the middle of the options object:
@@ -258,7 +259,7 @@ async function getAlphaVantageTechnicals(symbol: string) {
     );
     const macdData = await macdRes.json();
     const macdValues = macdData['Technical Analysis: MACD'];
-    let macd = null;
+    let macd: { value: number; signal: number; histogram: number } | null = null;
     if (macdValues) {
       const latest = Object.values(macdValues)[0] as Record<string, string>;
       macd = {

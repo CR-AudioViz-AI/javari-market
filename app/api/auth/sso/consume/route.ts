@@ -20,7 +20,7 @@ export const runtime = "nodejs";
 const CORE_ORIGIN = "https://craudiovizai.com";
 const NO_STORE = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } as const;
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<Response> {
   const limited = rateLimit(req);
   if (limited) return limited;
 

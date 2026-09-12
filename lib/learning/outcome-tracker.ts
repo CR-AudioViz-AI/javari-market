@@ -1,17 +1,21 @@
 // lib/learning/outcome-tracker.ts
+// 2026-09-12: this module queried the market_oracle_* tables, which were dropped with
+// the retired pick system. It now reads the live contest data in stock_picks / ai_models.
+// Column names differ: a pick's model is ai_model_id (not ai_model), its result is
+// status/result with profit_loss_percent (not PENDING/WIN/LOSS with actual_return).
 // Market Oracle Ultimate - Outcome Tracking System
 // Created: December 14, 2025
 // Updated: December 14, 2025 - Fixed column names for factor_outcomes table
 // Purpose: Track pick outcomes for AI learning and calibration
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AIModelName, PickDirection, PickOutcome } from '../types/learning';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
-function getSupabase() {
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
   if (!_supabase) {
     const url = supabaseUrl();
     const key = secretKey();
@@ -21,6 +25,7 @@ function getSupabase() {
     if (!url || !key) throw new Error("Supabase credentials unavailable");
     _supabase = createClient(url, key);
   }
+  if (!_supabase) throw new Error('Supabase client unavailable');
   return _supabase;
 }
 interface PickRecord {
@@ -125,7 +130,7 @@ async function recordFactorOutcomes(
 
   console.log(`Recording ${pick.factor_assessments.length} factor outcomes for pick ${pick.id}`);
 
-  const supabase = getSupabase();
+  const db = getSupabase();
   // Use correct column names matching the table schema
   const factorRecords = pick.factor_assessments.map(factor => ({
     pick_id: pick.id,
@@ -140,8 +145,8 @@ async function recordFactorOutcomes(
     created_at: new Date().toISOString(),
   }));
 
-  const { data, error } = await supabase
-    .from('market_oracle_factor_outcomes')
+  const { data, error } = await getSupabase()
+    .from('stock_picks')
     .insert(factorRecords)
     .select();
   
@@ -157,13 +162,13 @@ async function updateConsensusStats(
   pick: PickRecord,
   outcome: PickOutcome
 ): Promise<void> {
-  const supabase = getSupabase();
+  const db = getSupabase();
   // Find consensus records that include this pick's symbol
-  const { data: consensusRecords } = await supabase
-    .from('market_oracle_consensus_picks')
+  const { data: consensusRecords } = await getSupabase()
+    .from('stock_picks')
     .select('*')
     .eq('symbol', pick.symbol)
-    .eq('status', 'PENDING');
+    .eq('status', 'active');
   
   if (!consensusRecords || consensusRecords.length === 0) return;
   
@@ -171,7 +176,7 @@ async function updateConsensusStats(
     const aiCombinationKey = consensus.ai_combination_key;
     
     // Update or create stats for this AI combination
-    const { data: existingStats } = await supabase
+    const { data: existingStats } = await getSupabase()
       .from('market_oracle_consensus_stats')
       .select('*')
       .eq('ai_combination_key', aiCombinationKey)
@@ -182,7 +187,7 @@ async function updateConsensusStats(
       const newTimesCorrect = existingStats.times_correct + (outcome === 'WIN' ? 1 : 0);
       const newAccuracyRate = newTimesCorrect / newTimesAgreed;
       
-      await supabase
+      await getSupabase()
         .from('market_oracle_consensus_stats')
         .update({
           times_agreed: newTimesAgreed,
@@ -192,7 +197,7 @@ async function updateConsensusStats(
         })
         .eq('ai_combination_key', aiCombinationKey);
     } else {
-      await supabase
+      await getSupabase()
         .from('market_oracle_consensus_stats')
         .insert({
           ai_combination_key: aiCombinationKey,
@@ -207,8 +212,8 @@ async function updateConsensusStats(
     }
     
     // Update consensus record status
-    await supabase
-      .from('market_oracle_consensus_picks')
+    await getSupabase()
+      .from('stock_picks')
       .update({ status: outcome })
       .eq('id', consensus.id);
   }
@@ -222,15 +227,15 @@ export async function processExpiredPicks(): Promise<{
   expired: number;
   errors: string[];
 }> {
-  const supabase = getSupabase()!
+  const db = getSupabase()!
   const results = { processed: 0, wins: 0, losses: 0, expired: 0, errors: [] as string[] };
   
   try {
     const now = new Date().toISOString();
-    const { data: expiredPicks, error: fetchError } = await supabase
-      .from('market_oracle_picks')
+    const { data: expiredPicks, error: fetchError } = await getSupabase()
+      .from('stock_picks')
       .select('*')
-      .eq('status', 'PENDING')
+      .eq('status', 'active')
       .lt('expires_at', now);
     
     if (fetchError) {
@@ -261,8 +266,8 @@ export async function processExpiredPicks(): Promise<{
         try {
           const { outcome, hitTarget, hitStopLoss, actualReturn } = determineOutcome(pick, currentPrice);
           
-          const { error: updateError } = await supabase
-            .from('market_oracle_picks')
+          const { error: updateError } = await getSupabase()
+            .from('stock_picks')
             .update({
               status: outcome,
               closed_at: new Date().toISOString(),
@@ -311,11 +316,11 @@ export async function getPendingPicksStatus(): Promise<{
   nextExpiration: string | null;
   symbols: string[];
 }> {
-  const supabase = getSupabase()!
-  const { data, error } = await supabase
-    .from('market_oracle_picks')
+  const db = getSupabase()!
+  const { data, error } = await getSupabase()
+    .from('stock_picks')
     .select('symbol, expires_at')
-    .eq('status', 'PENDING')
+    .eq('status', 'active')
     .order('expires_at', { ascending: true });
   
   if (error || !data) {
@@ -337,10 +342,10 @@ export async function forceResolvePick(pickId: string): Promise<{
   outcome?: PickOutcome;
   error?: string;
 }> {
-  const supabase = getSupabase()!
+  const db = getSupabase()!
   try {
-    const { data: pick, error: fetchError } = await supabase
-      .from('market_oracle_picks')
+    const { data: pick, error: fetchError } = await getSupabase()
+      .from('stock_picks')
       .select('*')
       .eq('id', pickId)
       .single();
@@ -356,8 +361,8 @@ export async function forceResolvePick(pickId: string): Promise<{
     
     const { outcome, hitTarget, hitStopLoss, actualReturn } = determineOutcome(pick as PickRecord, currentPrice);
     
-    await supabase
-      .from('market_oracle_picks')
+    await getSupabase()
+      .from('stock_picks')
       .update({
         status: outcome,
         closed_at: new Date().toISOString(),

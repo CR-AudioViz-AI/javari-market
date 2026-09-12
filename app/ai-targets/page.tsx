@@ -1,5 +1,8 @@
 'use client';
 
+// Symbols the models are currently holding. Static so the page needs no data to render.
+const SUGGESTED = ['NVDA', 'META', 'AMD', 'AAPL', 'MSFT'];
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { Target, Brain, TrendingUp, TrendingDown, AlertTriangle, Loader2, Search, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
@@ -69,6 +72,17 @@ export default function AITargetsPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input type="text" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && fetchTargets()} placeholder="Enter symbol (AAPL, TSLA...)" className="w-full pl-12 pr-4 py-4 bg-gray-900/50 border border-gray-700 rounded-xl focus:border-purple-500 focus:outline-none text-lg" />
+              </div>
+              {/* 2026-09-12: the page opened blank with only a search box, so it read as
+                  broken. These are the symbols the contest is holding right now. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-400">Try:</span>
+                {SUGGESTED.map((sym) => (
+                  <button key={sym} type="button" onClick={() => { setSymbol(sym); setTimeout(fetchTargets, 0); }}
+                    className="inline-flex min-h-[2.75rem] items-center rounded-lg px-3 text-sm text-gray-200 ring-1 ring-white/15 hover:bg-white/5">
+                    {sym}
+                  </button>
+                ))}
               </div>
               <button onClick={fetchTargets} disabled={loading || !symbol.trim()} className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl font-semibold disabled:opacity-50 flex items-center gap-2">
                 {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing...</> : <><Sparkles className="w-5 h-5" /> Get Targets</>}

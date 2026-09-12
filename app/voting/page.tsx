@@ -169,10 +169,10 @@ function PollCard({
     const counts: Record<string, number> = {};
     poll.options.forEach(opt => { counts[opt] = 0; });
     
-    // Add some base votes for realism
-    poll.options.forEach((opt, i) => {
-      counts[opt] = Math.floor(Math.random() * 50) + 20 + (i === 0 ? 30 : 0);
-    });
+    // 2026-09-12: removed invented "base votes for realism" - Math.floor(Math.random()
+    // * 50) + 20 per option. It fabricated a crowd that did not exist, and because it
+    // ran during render the server and browser produced different numbers, which is the
+    // React hydration error this page threw on every load. Counts are now real votes only.
     
     // Add actual votes
     allVotes
@@ -350,7 +350,7 @@ export default function VotingPage() {
             <JavariHelpButton topic="voting polls how to vote" />
           </h1>
           <p className="text-gray-400">
-            Vote on AI picks and community polls. Your votes are saved locally.
+            Vote on AI picks and community polls. Votes are saved in this browser only, and the counts shown are real votes - nothing is simulated.
           </p>
         </div>
         

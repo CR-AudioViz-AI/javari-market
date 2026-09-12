@@ -498,7 +498,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Market data aggregation error:', error);
     return NextResponse.json(
-      { error: 'The request could not be completed.', code: 'INTERNAL_ERROR' || 'Failed to fetch market data' },
+      { error: 'The request could not be completed.', code: 'INTERNAL_ERROR' },
       { status: 500 }
     );
   }

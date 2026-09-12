@@ -4,7 +4,7 @@
 // Central export for all learning system modules
 
 export * from './calibration-engine';
-export * from './factor-tracker';
+// 2026-09-12: factor-tracker removed (unused, and it queried dropped tables).
 export * from './javari-consensus';
 
 // Re-export types

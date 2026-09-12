@@ -1,12 +1,12 @@
 import { rateLimit } from '@/lib/api/rate-limit';
 // app/api/market-oracle/test-gpt4/route.ts - GPT-4 DIAGNOSTIC
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 // Lazy Supabase client — initialized on first request (not at module load time)
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
+let _supabase: SupabaseClient | null = null;
 function getSupabase() {
   if (!_supabase) {
     const url = supabaseUrl();
