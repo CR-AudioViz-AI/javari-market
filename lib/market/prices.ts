@@ -137,3 +137,57 @@ export async function getStockNames(tickers: string[]): Promise<Map<string, stri
   }
   return out;
 }
+
+
+/**
+ * Recent performance for many tickers at once. 2026-09-12: the research pages needed to
+ * rank by how a name has actually done, and the universe stored only a price.
+ *
+ * Yahoo's spark endpoint returns a month of daily closes for twenty symbols per call, so
+ * a 503-name index costs about 26 requests at build time rather than one per symbol. A
+ * second pass at weekly resolution covers the year.
+ */
+export type Performance = { day: number | null; week: number | null; month: number | null; year: number | null };
+
+function pctChange(from: number | undefined, to: number | undefined): number | null {
+  if (!from || !to || !Number.isFinite(from) || !Number.isFinite(to)) return null;
+  return Number((((to - from) / from) * 100).toFixed(2));
+}
+
+async function sparkCloses(tickers: string[], range: string, interval: string): Promise<Map<string, number[]>> {
+  const out = new Map<string, number[]>();
+  for (const group of chunk(tickers, 20)) {
+    try {
+      const url = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${encodeURIComponent(group.join(","))}&range=${range}&interval=${interval}`;
+      const data = (await getJson(url)) as { spark?: { result?: { symbol?: string; response?: { indicators?: { quote?: { close?: (number | null)[] }[] } }[] }[] } };
+      for (const r of data.spark?.result ?? []) {
+        const closes = (r.response?.[0]?.indicators?.quote?.[0]?.close ?? []).filter((n): n is number => typeof n === "number" && Number.isFinite(n));
+        if (r.symbol && closes.length) out.set(r.symbol.toUpperCase(), closes);
+      }
+    } catch (error) {
+      console.error(`[prices] spark ${range} failed for ${group.length} symbols: ${(error as Error).message}`);
+    }
+  }
+  return out;
+}
+
+export async function getPerformance(tickers: string[]): Promise<Map<string, Performance>> {
+  const wanted = [...new Set(tickers.map((t) => t.trim().toUpperCase()).filter(Boolean))];
+  const [monthly, yearly] = await Promise.all([
+    sparkCloses(wanted, "1mo", "1d"),
+    sparkCloses(wanted, "1y", "1wk"),
+  ]);
+  const out = new Map<string, Performance>();
+  for (const symbol of wanted) {
+    const m = monthly.get(symbol) ?? [];
+    const y = yearly.get(symbol) ?? [];
+    const last = m[m.length - 1] ?? y[y.length - 1];
+    out.set(symbol, {
+      day: pctChange(m[m.length - 2], last),
+      week: pctChange(m[m.length - 6], last),
+      month: pctChange(m[0], last),
+      year: pctChange(y[0], last),
+    });
+  }
+  return out;
+}

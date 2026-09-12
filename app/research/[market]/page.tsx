@@ -34,7 +34,7 @@ export default async function MarketResearch({ params }: { params: Promise<{ mar
     .order("snapshot_date", { ascending: false }).limit(1).maybeSingle();
   const snapshot = latest?.snapshot_date as string | undefined;
   const { data: rows } = snapshot
-    ? await db.from("market_universe").select("symbol, name, price, volume, market_cap, sector")
+    ? await db.from("market_universe").select("symbol, name, price, volume, market_cap, sector, change_day, change_week, change_month, change_year")
         .eq("category", market).eq("snapshot_date", snapshot).order("symbol")
     : { data: [] };
 
@@ -45,6 +45,10 @@ export default async function MarketResearch({ params }: { params: Promise<{ mar
     volume: r.volume === null ? null : Number(r.volume),
     marketCap: r.market_cap === null ? null : Number(r.market_cap),
     sector: r.sector ? String(r.sector) : null,
+    changeDay: r.change_day === null || r.change_day === undefined ? null : Number(r.change_day),
+    changeWeek: r.change_week === null || r.change_week === undefined ? null : Number(r.change_week),
+    changeMonth: r.change_month === null || r.change_month === undefined ? null : Number(r.change_month),
+    changeYear: r.change_year === null || r.change_year === undefined ? null : Number(r.change_year),
   }));
 
   return (
@@ -54,8 +58,7 @@ export default async function MarketResearch({ params }: { params: Promise<{ mar
         <p className="text-xs uppercase tracking-wide text-sky-400">Research</p>
         <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">{LABELS[market]}</h1>
         <p className="mt-1 text-sm text-gray-300">
-          All {symbols.length} names the models choose from. Tap any one for a year of prices, its trend and momentum
-          indicators, and recent news — then add it to your picks from there.
+          All {symbols.length} names the models choose from. The ten best and worst performers are at the top; sort and filter the rest any way you like. Tap any one for a year of prices, its indicators and recent news — then add it to your picks from there.
         </p>
         <nav aria-label="Other markets" className="mt-3 flex flex-wrap gap-2">
           {Object.entries(LABELS).map(([id, label]) => (

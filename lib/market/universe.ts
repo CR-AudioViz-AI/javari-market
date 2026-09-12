@@ -20,9 +20,9 @@
 // CR AudioViz AI, LLC · EIN 39-3646201
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getStockNames, getStockPrices } from "@/lib/market/prices";
+import { getPerformance, getStockNames, getStockPrices, type Performance } from "@/lib/market/prices";
 
-export type UniverseRow = { symbol: string; name: string | null; price: number | null; volume: number | null; marketCap: number | null };
+export type UniverseRow = { symbol: string; name: string | null; price: number | null; volume: number | null; marketCap: number | null; performance?: Performance | null; sector?: string | null };
 export type UniverseCategory = "sp500" | "nasdaq" | "dow" | "penny" | "crypto";
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; JavariMarketOracle/1.0; +https://javarimarket.com)" };
@@ -230,11 +230,16 @@ async function nasdaq100Symbols(): Promise<string[]> {
 
 
 async function cryptoTop100(): Promise<UniverseRow[]> {
-  const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1", {
+  const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h,7d,30d,1y", {
     cache: "no-store", signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
-  const coins = (await res.json()) as { symbol?: string; name?: string; current_price?: number; total_volume?: number; market_cap?: number }[];
+  const coins = (await res.json()) as {
+    symbol?: string; name?: string; current_price?: number; total_volume?: number; market_cap?: number;
+    price_change_percentage_24h_in_currency?: number; price_change_percentage_7d_in_currency?: number;
+    price_change_percentage_30d_in_currency?: number; price_change_percentage_1y_in_currency?: number;
+  }[];
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? Number(v.toFixed(2)) : null);
   return coins
     .map((c) => ({
       symbol: (c.symbol ?? "").toUpperCase(),
@@ -242,6 +247,14 @@ async function cryptoTop100(): Promise<UniverseRow[]> {
       price: typeof c.current_price === "number" ? c.current_price : null,
       volume: typeof c.total_volume === "number" ? Math.round(c.total_volume) : null,
       marketCap: typeof c.market_cap === "number" ? c.market_cap : null,
+      // 2026-09-12: the same feed already carries these, so crypto ranks by performance
+      // without a single extra request.
+      performance: {
+        day: num(c.price_change_percentage_24h_in_currency),
+        week: num(c.price_change_percentage_7d_in_currency),
+        month: num(c.price_change_percentage_30d_in_currency),
+        year: num(c.price_change_percentage_1y_in_currency),
+      },
     }))
     .filter((c) => c.symbol && c.price !== null && !STABLECOINS.has(c.symbol));
 }
@@ -255,9 +268,11 @@ export async function buildUniverse(category: UniverseCategory): Promise<Univers
   // screen, which genuinely needs to scan every listing, still does.
   if (category !== "penny") {
     const members = category === "dow" ? DOW_65 : category === "nasdaq" ? await nasdaq100Symbols() : await sp500Symbols();
-    const [prices, names] = await Promise.all([getStockPrices(members), getStockNames(members)]);
+    // 2026-09-12: performance rides along with the price so the research pages can rank
+    // by how a name has actually done, not just what it costs.
+    const [prices, names, perf] = await Promise.all([getStockPrices(members), getStockNames(members), getPerformance(members)]);
     return members
-      .map((symbol) => ({ symbol, name: names.get(symbol) ?? null, price: prices.get(symbol) ?? null, volume: null, marketCap: null }))
+      .map((symbol) => ({ symbol, name: names.get(symbol) ?? null, price: prices.get(symbol) ?? null, volume: null, marketCap: null, performance: perf.get(symbol) ?? null }))
       .filter((r) => r.price !== null);
   }
 
@@ -286,7 +301,7 @@ async function previousSnapshot(db: SupabaseClient, category: UniverseCategory):
 }
 
 export async function getUniverse(db: SupabaseClient, category: UniverseCategory, snapshotDate: string, allowBuild = false): Promise<UniverseRow[]> {
-  const { data, error } = await db.from("market_universe").select("symbol, name, price, volume, market_cap")
+  const { data, error } = await db.from("market_universe").select("symbol, name, price, volume, market_cap, change_day, change_week, change_month, change_year")
     .eq("snapshot_date", snapshotDate).eq("category", category);
   if (error) throw new Error(`universe read: ${error.message}`);
   if ((data ?? []).length) {
@@ -295,6 +310,12 @@ export async function getUniverse(db: SupabaseClient, category: UniverseCategory
       price: r.price === null ? null : Number(r.price),
       volume: r.volume === null ? null : Number(r.volume),
       marketCap: r.market_cap === null ? null : Number(r.market_cap),
+      performance: {
+        day: r.change_day === null || r.change_day === undefined ? null : Number(r.change_day),
+        week: r.change_week === null || r.change_week === undefined ? null : Number(r.change_week),
+        month: r.change_month === null || r.change_month === undefined ? null : Number(r.change_month),
+        year: r.change_year === null || r.change_year === undefined ? null : Number(r.change_year),
+      },
     }));
   }
   // 2026-09-12: this used to BUILD the universe when a snapshot was missing - inside
@@ -328,6 +349,8 @@ export async function getUniverse(db: SupabaseClient, category: UniverseCategory
     rows.map((r) => ({
       snapshot_date: snapshotDate, category, symbol: r.symbol, name: r.name,
       price: r.price, volume: r.volume, market_cap: r.marketCap,
+      change_day: r.performance?.day ?? null, change_week: r.performance?.week ?? null,
+      change_month: r.performance?.month ?? null, change_year: r.performance?.year ?? null,
     })),
     { onConflict: "snapshot_date,category,symbol" },
   );
