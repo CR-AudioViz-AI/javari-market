@@ -9,8 +9,8 @@ import { EmbedBridge, EMBED_PREPAINT_SCRIPT } from '@craudioviz/platform-sdk'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Javari Market Oracle',
-  description: 'Live market data, AI stock picks generated at 9:35 AM ET on market days.',
-  openGraph: { title: 'Javari Market Oracle', description: 'Live market data, AI stock picks generated at 9:35 AM ET on market days.', type: 'website' },
+  description: 'Six named AI models each pick one stock a day from the same research, scored publicly on what really happens. Research only - not investment advice.',
+  openGraph: { title: 'Javari Market Oracle', description: 'Six named AI models each pick one stock a day from the same research, scored publicly on what really happens. Research only - not investment advice.', type: 'website' },
 }
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,7 +19,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* factory 2026-09-10: marks an embedded page before first paint */}
         <script dangerouslySetInnerHTML={{ __html: EMBED_PREPAINT_SCRIPT }} />
       </head>
-      <body style={{ margin: 0, padding: 0, fontFamily: 'system-ui, sans-serif' }}>
+      {/* 2026-09-11: the page had NO background colour. Every old page painted its own
+          dark panel, so nothing looked wrong until a page relied on the canvas - then
+          white headings rendered white-on-white and simply vanished. The shell owns the
+          background now; dark panels sit on top of it unchanged. */}
+      <body style={{ margin: 0, padding: 0, fontFamily: 'system-ui, sans-serif', background: '#05070b', color: '#e5e7eb', colorScheme: 'dark', minHeight: '100vh' }}>
         <EmbedBridge />
         {/* 2026-09-10: WCAG 2.4.1. Without this a keyboard user traverses the
             entire navigation on every page before reaching anything. Visually
@@ -32,13 +36,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to main content
         </a>
 
-        <div data-app-chrome style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)', padding: '6px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 200 }}>
-          <a href="https://craudiovizai.com" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: '#fff', fontSize: 13, fontWeight: 600 }}>
-            <span>📈</span>
-            <span style={{ color: '#3b82f6' }}>Javari Market Oracle</span>
-            <span style={{ color: '#374151', fontSize: 11, marginLeft: 4 }}>· CR AudioViz AI · EIN 39-3646201</span>
+        {/* One line on a phone: the brand truncates, the EIN is desktop-only. It used to
+            wrap to three lines and push the page down. */}
+        <div data-app-chrome style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)', padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 44, position: 'relative', zIndex: 200 }}>
+          <a href="https://craudiovizai.com" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, textDecoration: 'none', color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span aria-hidden>📈</span>
+            <span style={{ color: '#38bdf8' }}>Javari Market Oracle</span>
+            <span className="hidden sm:inline" style={{ color: '#4b5563', fontSize: 11 }}>· CR AudioViz AI · EIN 39-3646201</span>
           </a>
-          <a href="https://craudiovizai.com/auth/signup" style={{ background: '#3b82f6', color: '#000', borderRadius: 6, padding: '4px 14px', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+          <a href="https://craudiovizai.com/auth/signup" style={{ background: '#38bdf8', color: '#04121c', borderRadius: 6, padding: '8px 14px', fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
             Free to Start →
           </a>
         </div>
