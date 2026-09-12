@@ -83,6 +83,12 @@ export async function pricesFor(market: MarketId): Promise<Map<string, number>> 
 export const STOCK_POOL = [...MARKETS.sp500.symbols];
 
 const PICK_PURPOSE = "market_pick";
+
+/** What each market has to beat. A pick that rises while its index rises more is not a win.
+ *  2026-09-12 */
+export const BENCHMARKS: Record<MarketId, string> = {
+  sp500: "SPY", nasdaq: "QQQ", dow: "DIA", penny: "IWM", crypto: "BTC",
+};
 const HOLD_DAYS = 7;
 
 type Db = SupabaseClient;
@@ -321,6 +327,20 @@ export async function runDailyBattle(db: Db, now: Date, markets: MarketId[] = MA
   report.prices += prices.size;
   if (prices.size < 5) { report.errors.push(`${market}: only ${prices.size} prices available`); continue; }
 
+  // The benchmark's price today, stored once per market per day.
+  const benchSymbol = BENCHMARKS[market];
+  let benchEntry: number | null = null;
+  try {
+    const bench = benchSymbol === "BTC" ? await pricesFor("crypto") : await getStockPrices([benchSymbol]);
+    benchEntry = bench.get(benchSymbol) ?? null;
+    if (benchEntry !== null) {
+      const { error: bErr } = await db.from("market_benchmark_prices").upsert({ pick_date: pickDate, symbol: benchSymbol, price: benchEntry }, { onConflict: "pick_date,symbol" });
+      if (bErr) report.errors.push(`benchmark price: ${bErr.message}`);
+    }
+  } catch (e) {
+    report.errors.push(`${market} benchmark: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   const pack = await buildResearchPack(db, pickDate, market, prices);
   report.research = { chars: (report.research?.chars ?? 0) + pack.body.length, sources: (report.research?.sources ?? 0) + pack.sources.length };
 
@@ -366,6 +386,7 @@ export async function runDailyBattle(db: Db, now: Date, markets: MarketId[] = MA
       risk_factors: p.what_would_make_me_wrong ? [...p.risks, `Would be wrong if: ${p.what_would_make_me_wrong}`] : p.risks,
       conviction: p.conviction,
       status: "active", pick_date: pickDate, expiry_date: expiryDate,
+      benchmark_symbol: benchSymbol, benchmark_entry: benchEntry,
       javari_request_id: r.requestId, research_sha256: pack.sha, seal_sha256: seal,
       sources: used.map((s) => ({ title: s.title, url: s.url, site: s.site })),
       price_updated_at: now.toISOString(),

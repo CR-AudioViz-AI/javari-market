@@ -256,6 +256,24 @@ export async function GET(request: NextRequest) {
           price_updated_at: new Date().toISOString()
         };
         
+        // 2026-09-12: score the pick against its market's benchmark over the same
+        // window. Rising with a rising index is not skill; alpha is the difference.
+        if (pick.benchmark_symbol && pick.benchmark_entry) {
+          try {
+            const benchNow = pick.benchmark_symbol === 'BTC'
+              ? (await (await import('@/lib/market/battle')).pricesFor('crypto')).get('BTC') ?? null
+              : await getStockPrice(pick.benchmark_symbol as string);
+            if (benchNow) {
+              const benchReturn = ((benchNow - Number(pick.benchmark_entry)) / Number(pick.benchmark_entry)) * 100;
+              updateData.benchmark_current = benchNow;
+              updateData.benchmark_return = Number(benchReturn.toFixed(4));
+              updateData.alpha = Number((pickResult.profit_loss_percent - benchReturn).toFixed(4));
+            }
+          } catch (e) {
+            results.errors.push(`Benchmark for ${pick.ticker}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
         if (pickResult.result !== 'pending') {
           updateData.status = 'closed';
           updateData.result = pickResult.result;

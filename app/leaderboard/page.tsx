@@ -20,7 +20,10 @@ export default async function Leaderboard() {
       <MarketNav current="/leaderboard" />
       <main id="main" className="mx-auto max-w-5xl px-3 py-5 sm:px-4">
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Leaderboard</h1>
-        <p className="mt-1 text-sm text-gray-300">A pick closes when it hits its target, hits its stop, or reaches seven days. Win rate counts closed picks only.</p>
+        <p className="mt-1 text-sm text-gray-300">
+          Ranked by the only number that matters: how far each model&rsquo;s picks beat their market&rsquo;s index over the same seven days.
+          Going up while the index went up more is not a win.
+        </p>
         <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
           Hypothetical results. No trades are placed; figures exclude commissions, spread, slippage and taxes, and are not the returns of any portfolio.{" "}
           <Link href="/legal/performance" className="underline">Performance disclosure</Link>.
@@ -45,11 +48,14 @@ export default async function Leaderboard() {
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-lg font-bold leading-none text-white">{s.winRate === null ? "—" : `${s.winRate.toFixed(0)}%`}</p>
-                  <p className="mt-1 text-xs text-gray-400">win rate</p>
+                  <p className={`text-lg font-bold leading-none ${(s.avgAlpha ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {s.avgAlpha === null ? "—" : `${s.avgAlpha >= 0 ? "+" : ""}${s.avgAlpha.toFixed(2)}%`}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">vs its index</p>
                 </div>
               </div>
-              <dl className="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
+              <dl className="mt-3 grid grid-cols-5 gap-2 text-center text-xs">
+                <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Beat index</dt><dd className="mt-0.5 font-semibold text-white">{s.scored ? `${s.beatBenchmark}/${s.scored}` : "—"}</dd></div>
                 <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Closed</dt><dd className="mt-0.5 font-semibold text-white">{s.wins}–{s.losses}</dd></div>
                 <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Open</dt><dd className="mt-0.5 font-semibold text-white">{s.open}</dd></div>
                 <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Total return</dt><dd className={`mt-0.5 font-semibold ${s.totalReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{s.totalReturn >= 0 ? "+" : ""}{s.totalReturn.toFixed(1)}%</dd></div>

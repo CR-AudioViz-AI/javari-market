@@ -17,12 +17,18 @@ function db(): SupabaseClient {
 
 export type Model = { id: string; display_name: string; slug: string | null; provider: string; color: string | null; tagline: string | null; specialty: string | null; javari_model: string };
 export type Pick = {
-  id: string; modelId: string; symbol: string; confidence: number;
+  id: string; modelId: string; symbol: string; confidence: number; conviction: number | null;
+  market: string; benchmarkSymbol: string | null; benchmarkReturn: number | null; alpha: number | null;
   entry: number; current: number | null; target: number; stop: number;
   thesis: string; keyFactors: string[]; risks: string[]; sources: { title: string; url: string; site: string }[];
   status: string; result: string | null; changePct: number | null; pickDate: string; seal: string | null;
 };
-export type Standing = { model: Model; picks: number; wins: number; losses: number; winRate: number | null; totalReturn: number; open: number; avgConfidence: number | null };
+export type Standing = {
+  model: Model; picks: number; wins: number; losses: number; winRate: number | null;
+  totalReturn: number; open: number; avgConfidence: number | null;
+  /** Average alpha: how far its picks beat their benchmark. The number that matters. */
+  avgAlpha: number | null; beatBenchmark: number; scored: number;
+};
 
 const Sources = z.array(z.object({ title: z.string(), url: z.string(), site: z.string().default("") })).catch([]);
 const Strings = z.array(z.string()).catch([]);
@@ -31,7 +37,10 @@ const num = (v: unknown): number | null => (v === null || v === undefined ? null
 function toPick(r: Record<string, unknown>): Pick {
   return {
     id: String(r.id), modelId: String(r.ai_model_id), symbol: String(r.symbol ?? r.ticker ?? ""),
-    confidence: Number(r.confidence ?? 0), entry: Number(r.entry_price ?? 0), current: num(r.current_price),
+    confidence: Number(r.confidence ?? 0), conviction: r.conviction === null || r.conviction === undefined ? null : Number(r.conviction),
+    market: String(r.market_category ?? r.category ?? "sp500"),
+    benchmarkSymbol: r.benchmark_symbol ? String(r.benchmark_symbol) : null,
+    benchmarkReturn: num(r.benchmark_return), alpha: num(r.alpha), entry: Number(r.entry_price ?? 0), current: num(r.current_price),
     target: Number(r.target_price ?? 0), stop: Number(r.stop_loss ?? 0),
     thesis: String(r.reasoning ?? r.reasoning_summary ?? ""),
     keyFactors: Strings.parse(r.key_factors), risks: Strings.parse(r.risk_factors), sources: Sources.parse(r.sources),
@@ -74,7 +83,7 @@ export async function getStandings(): Promise<Standing[]> {
   const models = await getActiveModels();
   const ids = models.map((m) => m.id);
   if (!ids.length) return [];
-  const { data, error } = await d.from("stock_picks").select("ai_model_id, status, result, profit_loss_percent, confidence").in("ai_model_id", ids);
+  const { data, error } = await d.from("stock_picks").select("ai_model_id, status, result, profit_loss_percent, confidence, alpha, market_category").in("ai_model_id", ids);
   if (error) throw new Error(`standings: ${error.message}`);
   const rows = data ?? [];
   return models.map((model) => {
@@ -83,14 +92,20 @@ export async function getStandings(): Promise<Standing[]> {
     const wins = closed.filter((r) => r.result === "win").length;
     const losses = closed.filter((r) => r.result === "loss").length;
     const conf = mine.map((r) => Number(r.confidence)).filter((n) => Number.isFinite(n));
+    const withAlpha = closed.filter((r) => r.alpha !== null && r.alpha !== undefined);
     return {
       model, picks: mine.length, wins, losses,
       winRate: wins + losses ? (wins / (wins + losses)) * 100 : null,
       totalReturn: closed.reduce((s, r) => s + (Number(r.profit_loss_percent) || 0), 0),
       open: mine.filter((r) => r.status === "active").length,
       avgConfidence: conf.length ? conf.reduce((a, b) => a + b, 0) / conf.length : null,
+      avgAlpha: withAlpha.length ? withAlpha.reduce((s, r) => s + Number(r.alpha), 0) / withAlpha.length : null,
+      beatBenchmark: withAlpha.filter((r) => Number(r.alpha) > 0).length,
+      scored: withAlpha.length,
     };
-  }).sort((a, b) => (b.winRate ?? -1) - (a.winRate ?? -1) || b.totalReturn - a.totalReturn || a.model.display_name.localeCompare(b.model.display_name));
+  })
+  // Winners first: beating the benchmark ranks above simply going up. 2026-09-12
+  .sort((a, b) => (b.avgAlpha ?? -999) - (a.avgAlpha ?? -999) || (b.winRate ?? -1) - (a.winRate ?? -1) || b.totalReturn - a.totalReturn || a.model.display_name.localeCompare(b.model.display_name));
 }
 
 export async function getRecentClosed(limit = 12): Promise<(Pick & { modelName: string; color: string | null })[]> {
@@ -104,4 +119,55 @@ export async function getRecentClosed(limit = 12): Promise<(Pick & { modelName: 
     const m = byId.get(p.modelId);
     return { ...p, modelName: m?.display_name ?? "Retired model", color: m?.color ?? null };
   });
+}
+
+// ── The board: every market, every model's pick, ranked so the models with the best
+//    record appear first. 2026-09-12 (Roy: "push the winners to the top").
+export type BoardPick = Pick & { model: Model; rank: number; record: { winRate: number | null; avgAlpha: number | null; scored: number } };
+export type MarketBoard = { market: string; label: string; benchmark: string | null; picks: BoardPick[]; agreement: { symbol: string; count: number } | null };
+
+const MARKET_LABELS: Record<string, string> = {
+  sp500: "S&P 500", nasdaq: "Nasdaq 100", dow: "Dow 30", penny: "Penny stocks", crypto: "Crypto",
+};
+
+export async function getBoards(): Promise<{ pickDate: string | null; boards: MarketBoard[] }> {
+  const d = db();
+  const [{ data: last, error: lErr }, standings, models] = await Promise.all([
+    d.from("stock_picks").select("pick_date").not("javari_request_id", "is", null).order("pick_date", { ascending: false }).limit(1).maybeSingle(),
+    getStandings(),
+    getActiveModels(),
+  ]);
+  if (lErr) throw new Error(lErr.message);
+  const pickDate = last?.pick_date ? String(last.pick_date) : null;
+  if (!pickDate) return { pickDate: null, boards: [] };
+
+  const { data: rows, error } = await d.from("stock_picks").select("*").eq("pick_date", pickDate).not("javari_request_id", "is", null);
+  if (error) throw new Error(error.message);
+  const byId = new Map(models.map((m) => [m.id, m]));
+  const rankOf = new Map(standings.map((s, i) => [s.model.id, i + 1]));
+  const recordOf = new Map(standings.map((s) => [s.model.id, { winRate: s.winRate, avgAlpha: s.avgAlpha, scored: s.scored }]));
+
+  const boards: MarketBoard[] = [];
+  for (const market of ["sp500", "nasdaq", "dow", "penny", "crypto"]) {
+    const picks = (rows ?? [])
+      .filter((r) => String(r.market_category ?? r.category) === market)
+      .map((r) => {
+        const p = toPick(r as Record<string, unknown>);
+        const model = byId.get(p.modelId);
+        return model ? { ...p, model, rank: rankOf.get(p.modelId) ?? 99, record: recordOf.get(p.modelId) ?? { winRate: null, avgAlpha: null, scored: 0 } } : null;
+      })
+      .filter((p): p is BoardPick => p !== null)
+      .sort((a, b) => a.rank - b.rank || b.confidence - a.confidence);
+    if (!picks.length) continue;
+    const counts = new Map<string, number>();
+    for (const p of picks) counts.set(p.symbol, (counts.get(p.symbol) ?? 0) + 1);
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    boards.push({
+      market, label: MARKET_LABELS[market] ?? market,
+      benchmark: picks[0]?.benchmarkSymbol ?? null,
+      picks,
+      agreement: top && top[1] > 1 ? { symbol: top[0], count: top[1] } : null,
+    });
+  }
+  return { pickDate, boards };
 }

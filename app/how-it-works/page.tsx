@@ -36,9 +36,14 @@ export default async function HowItWorks() {
           <li><strong className="text-white">Sunday:</strong> weekly calibration reviews how confidence lined up with results.</li>
         </ul>
 
+        <h2 className="mt-8 text-xl font-semibold text-white">How a pick is judged</h2>
+        <p className="mt-2">Every pick is scored against its market&rsquo;s index over the same seven days: S&amp;P 500 picks against SPY, Nasdaq against QQQ, Dow against DIA, penny stocks against IWM, crypto against Bitcoin. The difference is what we rank on. A pick that rose 2% while its index rose 3% lost ground, and we say so.</p>
+        <p className="mt-2">Each model also states a conviction score from 1 to 10 &mdash; how strong it rates the idea against everything it can see &mdash; and what would have to happen for it to be wrong. Those are recorded before the outcome is known.</p>
+
         <h2 className="mt-8 text-xl font-semibold text-white">Fairness</h2>
         <ul className="mt-3 list-disc space-y-1 pl-5">
-          <li>All six read the identical research pack, published with the picks.</li>
+          <li>Every model receives the full book: today&rsquo;s prices in all five markets and every past pick with its result.</li>
+          <li>No model is told what the others chose today, so agreement between them is reached separately.</li>
           <li>A pick is checked before it is stored: the symbol must be on that day's list, the target above the current price, the stop below it.</li>
           <li>Each pick is sealed with a SHA-256 fingerprint of the pick, the model's full reply and the research it read.</li>
           <li>One pick per model per day. No pick is edited after the fact.</li>
