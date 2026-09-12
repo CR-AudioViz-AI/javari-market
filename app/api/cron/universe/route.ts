@@ -38,7 +38,8 @@ export async function GET(req: Request): Promise<NextResponse> {
   const errors: string[] = [];
   for (const category of CATEGORIES) {
     try {
-      const rows = await getUniverse(db, category, snapshotDate);
+      // true: the job is the one place a universe may be built. 2026-09-12
+      const rows = await getUniverse(db, category, snapshotDate, true);
       built[category] = rows.length;
     } catch (e) {
       errors.push(`${category}: ${e instanceof Error ? e.message : String(e)}`);

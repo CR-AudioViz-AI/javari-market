@@ -164,7 +164,7 @@ export async function buildResearchPack(db: Db, pickDate: string, market: Market
     return { body: have.body as string, sources: src.success ? src.data : [], sha: have.sha256 as string };
   }
 
-  const universe = await getUniverse(db, market, pickDate);
+  const universe = await getUniverse(db, market, pickDate, true);
   const lines: string[] = [
     `## ${MARKETS[market].label} - the full universe you may choose from (${universe.length} symbols, price in USD)`,
     universeTable(universe),

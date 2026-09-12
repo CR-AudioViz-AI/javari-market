@@ -254,7 +254,21 @@ export async function buildUniverse(category: UniverseCategory): Promise<Univers
 }
 
 /** Today's snapshot, built on first use and reused all day. */
-export async function getUniverse(db: SupabaseClient, category: UniverseCategory, snapshotDate: string): Promise<UniverseRow[]> {
+/** The most recent stored snapshot for a market. A read, never a build. 2026-09-12 */
+async function previousSnapshot(db: SupabaseClient, category: UniverseCategory): Promise<UniverseRow[]> {
+  const { data, error } = await db.from("market_universe").select("symbol, name, price, volume, market_cap, snapshot_date")
+    .eq("category", category).order("snapshot_date", { ascending: false }).limit(1200);
+  if (error) throw new Error(`universe fallback: ${error.message}`);
+  const newest = (data ?? [])[0]?.snapshot_date;
+  return (data ?? []).filter((r) => r.snapshot_date === newest).map((r) => ({
+    symbol: String(r.symbol), name: r.name === null ? null : String(r.name),
+    price: r.price === null ? null : Number(r.price),
+    volume: r.volume === null ? null : Number(r.volume),
+    marketCap: r.market_cap === null ? null : Number(r.market_cap),
+  }));
+}
+
+export async function getUniverse(db: SupabaseClient, category: UniverseCategory, snapshotDate: string, allowBuild = false): Promise<UniverseRow[]> {
   const { data, error } = await db.from("market_universe").select("symbol, name, price, volume, market_cap")
     .eq("snapshot_date", snapshotDate).eq("category", category);
   if (error) throw new Error(`universe read: ${error.message}`);
@@ -266,6 +280,14 @@ export async function getUniverse(db: SupabaseClient, category: UniverseCategory
       marketCap: r.market_cap === null ? null : Number(r.market_cap),
     }));
   }
+  // 2026-09-12: this used to BUILD the universe when a snapshot was missing - inside
+  // whatever request happened to ask first. A missing penny snapshot meant every visit
+  // to /my-picks scraped 7,163 listings live: the API took 72 SECONDS and the page sat
+  // on "Loading...". Building belongs to the scheduled job, never to a page load.
+  // Missing snapshot now falls straight back to the most recent one, which is a real
+  // universe a day or two old, and the job fills the gap on its next run.
+  if (!allowBuild) return await previousSnapshot(db, category);
+
   let rows: UniverseRow[];
   try {
     rows = await buildUniverse(category);
