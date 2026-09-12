@@ -10,8 +10,11 @@ interface NewsArticle {
   url: string;
   source: string;
   publishedAt: string;
-  sentiment: number;
-  sentimentLabel: string;
+  // 2026-09-12: the API returns sentiment as a label ("bullish") and the number as
+  // sentimentScore. The page treated sentiment as the number and read a
+  // sentimentLabel that does not exist, so every article row threw.
+  sentiment: string;
+  sentimentScore: number;
   tickers: string[];
   keywords: string[];
 }
@@ -44,8 +47,8 @@ export default function NewsFeedPage() {
   }
 
   const filteredArticles = data?.articles.filter(a => {
-    if (filter === 'bullish') return a.sentiment > 0.2;
-    if (filter === 'bearish') return a.sentiment < -0.2;
+    if (filter === 'bullish') return (a.sentimentScore ?? 0) > 0.2;
+    if (filter === 'bearish') return (a.sentimentScore ?? 0) < -0.2;
     return true;
   }) || [];
 
@@ -206,9 +209,9 @@ export default function NewsFeedPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {getSentimentIcon(article.sentiment)}
-                      <span className={`text-sm ${getSentimentColor(article.sentiment)}`}>
-                        {article.sentimentLabel}
+                      {getSentimentIcon(article.sentimentScore ?? 0)}
+                      <span className={`text-sm ${getSentimentColor(article.sentimentScore ?? 0)}`}>
+                        {article.sentiment}
                       </span>
                     </div>
                   </div>

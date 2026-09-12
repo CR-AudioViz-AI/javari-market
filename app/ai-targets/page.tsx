@@ -3,6 +3,20 @@
 // Symbols the models are currently holding. Static so the page needs no data to render.
 const SUGGESTED = ['NVDA', 'META', 'AMD', 'AAPL', 'MSFT'];
 
+// 2026-09-12: with nothing searched the page rendered ~350 characters and looked
+// broken. This explains what it does while it waits for a symbol.
+function EmptyState() {
+  return (
+    <div className="mt-6 rounded-xl border border-white/10 bg-[#111827] p-5">
+      <h2 className="font-semibold text-white">No symbol yet</h2>
+      <p className="mt-2 text-sm text-gray-300">
+        Enter a ticker above, or tap one of the suggestions, and every competing model will give its 30-day, 90-day and
+        12-month view of that company with the reasoning behind it. Research only &mdash; not investment advice.
+      </p>
+    </div>
+  );
+}
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { Target, Brain, TrendingUp, TrendingDown, AlertTriangle, Loader2, Search, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';

@@ -20,11 +20,67 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStockPrices } from "@/lib/market/prices";
 import { javariGenerate, javariResearch } from "@/lib/javari/door";
 
-export const STOCK_POOL = [
-  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "JPM", "V", "UNH",
-  "HD", "MA", "PG", "JNJ", "XOM", "DIS", "NFLX", "CRM", "AMD", "INTC",
-  "SOFI", "PLTR", "HOOD", "RIVN", "IONQ", "RKLB",
-];
+/** The five markets. Every model picks once per market per day. 2026-09-12 */
+export const MARKETS = {
+  sp500: {
+    label: "S&P 500",
+    symbols: ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "JPM", "V",
+              "UNH", "XOM", "JNJ", "PG", "MA", "HD", "CVX", "LLY", "ABBV", "PEP", "KO", "COST"],
+  },
+  nasdaq: {
+    label: "Nasdaq 100",
+    symbols: ["NVDA", "AMD", "AVGO", "QCOM", "MU", "INTC", "AMAT", "ADBE", "CRM", "NFLX",
+              "PYPL", "SBUX", "BKNG", "ISRG", "PANW", "SNPS", "MRVL", "TEAM", "DDOG", "CRWD"],
+  },
+  dow: {
+    label: "Dow 30",
+    symbols: ["AAPL", "MSFT", "JPM", "V", "UNH", "HD", "PG", "JNJ", "CVX", "MRK",
+              "DIS", "CAT", "BA", "GS", "IBM", "MCD", "NKE", "TRV", "AXP", "HON"],
+  },
+  penny: {
+    label: "Penny stocks",
+    symbols: ["SOFI", "PLTR", "HOOD", "RIVN", "LCID", "NIO", "IONQ", "RKLB", "JOBY", "GRAB",
+              "OPEN", "DNA", "FCEL", "PLUG", "BBAI", "CHPT", "WULF", "CIFR"],
+  },
+  crypto: {
+    label: "Crypto",
+    symbols: ["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT", "LTC"],
+  },
+} as const;
+
+export type MarketId = keyof typeof MARKETS;
+export const MARKET_IDS = Object.keys(MARKETS) as MarketId[];
+
+/** CoinGecko ids for the crypto pool - its free endpoint needs no key. */
+const COIN_IDS: Record<string, string> = {
+  BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple", ADA: "cardano",
+  DOGE: "dogecoin", AVAX: "avalanche-2", LINK: "chainlink", DOT: "polkadot", LTC: "litecoin",
+};
+
+async function cryptoPrices(symbols: readonly string[]): Promise<Map<string, number>> {
+  const ids = symbols.map((s) => COIN_IDS[s]).filter(Boolean).join(",");
+  const out = new Map<string, number>();
+  if (!ids) return out;
+  const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`, {
+    cache: "no-store", signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+  const json = (await res.json()) as Record<string, { usd?: number }>;
+  for (const sym of symbols) {
+    const id = COIN_IDS[sym];
+    const price = id ? json[id]?.usd : undefined;
+    if (typeof price === "number") out.set(sym, price);
+  }
+  return out;
+}
+
+export async function pricesFor(market: MarketId): Promise<Map<string, number>> {
+  const symbols = MARKETS[market].symbols;
+  return market === "crypto" ? cryptoPrices(symbols) : getStockPrices([...symbols]);
+}
+
+/** Kept for callers that still expect the old single pool. */
+export const STOCK_POOL = [...MARKETS.sp500.symbols];
 
 const PICK_PURPOSE = "market_pick";
 const HOLD_DAYS = 7;
@@ -93,16 +149,16 @@ function clip(s: string, n: number): string {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 }
 
-export async function buildResearchPack(db: Db, pickDate: string, prices: Map<string, number>): Promise<{ body: string; sources: Source[]; sha: string }> {
-  const { data: have, error } = await db.from("market_research_packs").select("*").eq("pick_date", pickDate).eq("category", "stocks").maybeSingle();
+export async function buildResearchPack(db: Db, pickDate: string, market: MarketId, prices: Map<string, number>): Promise<{ body: string; sources: Source[]; sha: string }> {
+  const { data: have, error } = await db.from("market_research_packs").select("*").eq("pick_date", pickDate).eq("category", market).maybeSingle();
   if (error) throw new Error(`research pack read: ${error.message}`);
   if (have) {
     const src = z.array(z.object({ n: z.number(), title: z.string(), url: z.string(), site: z.string() })).safeParse(have.sources);
     return { body: have.body as string, sources: src.success ? src.data : [], sha: have.sha256 as string };
   }
 
-  const lines: string[] = ["## Today's prices"];
-  for (const sym of STOCK_POOL) {
+  const lines: string[] = [`## ${MARKETS[market].label} - today's prices`];
+  for (const sym of MARKETS[market].symbols) {
     const p = prices.get(sym);
     if (p !== undefined) lines.push(`- ${sym}: $${p.toFixed(2)}`);
   }
@@ -110,7 +166,7 @@ export async function buildResearchPack(db: Db, pickDate: string, prices: Map<st
   // Recent closed picks tell every model how this contest has actually gone.
   const { data: recent, error: rErr } = await db.from("stock_picks")
     .select("symbol, direction, entry_price, current_price, profit_loss_percent, status, pick_date")
-    .eq("status", "closed").order("closed_at", { ascending: false }).limit(8);
+    .eq("status", "closed").eq("market_category", market).order("closed_at", { ascending: false }).limit(8);
   if (rErr) throw new Error(`recent picks: ${rErr.message}`);
   if ((recent ?? []).length) {
     lines.push("", "## How recent contest picks turned out");
@@ -122,7 +178,11 @@ export async function buildResearchPack(db: Db, pickDate: string, prices: Map<st
 
   const sources: Source[] = [];
   lines.push("", "## Market news");
-  const queries = ["stock market today major movers", "earnings results guidance this week", "Federal Reserve rates inflation market outlook"];
+  const queries = market === "crypto"
+    ? ["crypto market today bitcoin ethereum", "crypto regulation ETF flows news"]
+    : market === "penny"
+      ? ["small cap stocks movers today", "penny stock news catalysts this week"]
+      : [`${MARKETS[market].label} movers today`, "earnings results guidance this week", "Federal Reserve rates inflation market outlook"];
   for (const q of queries) {
     try {
       const items = await javariResearch(q, 4, 3);
@@ -141,9 +201,9 @@ export async function buildResearchPack(db: Db, pickDate: string, prices: Map<st
 
   const body = lines.join("\n");
   const sha = createHash("sha256").update(body).digest("hex");
-  const { error: insErr } = await db.from("market_research_packs").insert({ pick_date: pickDate, category: "stocks", body, sources, sha256: sha });
+  const { error: insErr } = await db.from("market_research_packs").insert({ pick_date: pickDate, category: market, body, sources, sha256: sha });
   if (insErr && insErr.code !== "23505") throw new Error(`research pack write: ${insErr.message}`);
-  if (insErr) return buildResearchPack(db, pickDate, prices);
+  if (insErr) return buildResearchPack(db, pickDate, market, prices);
   return { body, sources, sha };
 }
 
@@ -158,11 +218,11 @@ Rules:
 - Confidence must reflect how sure you really are, not how interesting the story is.
 - Reply with ONE JSON object and nothing else - no markdown, no code fences.`;
 
-export function buildUserPrompt(model: BattleModel, pack: string, record: { picks: number; wins: number; losses: number }): string {
+export function buildUserPrompt(model: BattleModel, market: MarketId, pack: string, record: { picks: number; wins: number; losses: number }): string {
   const rec = record.picks > 0
     ? `Your record in this contest so far: ${record.wins} winning picks, ${record.losses} losing picks over ${record.picks} closed picks.`
     : "This is your first pick in the contest.";
-  return `Javari Market Oracle - daily pick. You are ${model.display_name} (${model.provider}).
+  return `Javari Market Oracle - daily pick in ${MARKETS[market].label}. You are ${model.display_name} (${model.provider}).
 ${rec}
 
 RESEARCH PACK (every model receives exactly this)
@@ -193,36 +253,43 @@ async function modelRecord(db: Db, modelId: string): Promise<{ picks: number; wi
   };
 }
 
-export async function runDailyBattle(db: Db, now: Date): Promise<BattleReport> {
+export async function runDailyBattle(db: Db, now: Date, markets: MarketId[] = MARKET_IDS): Promise<BattleReport> {
   const pickDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(now);
-  const report: BattleReport = { pickDate, prices: 0, research: null, attempted: 0, saved: 0, failed: 0, skipped: [], errors: [] };
+  const report: BattleReport = { pickDate, prices: 0, research: { chars: 0, sources: 0 }, attempted: 0, saved: 0, failed: 0, skipped: [], errors: [] };
 
   const { data: models, error: mErr } = await db.from("ai_models").select("*").eq("is_active", true).not("javari_model", "is", null).order("display_name");
   if (mErr) throw new Error(`models: ${mErr.message}`);
   const active = (models ?? []) as unknown as BattleModel[];
   if (!active.length) { report.errors.push("no active models configured"); return report; }
 
-  const prices = await getStockPrices(STOCK_POOL);
-  report.prices = prices.size;
-  if (prices.size < 5) { report.errors.push(`only ${prices.size} prices available - not enough to run a fair battle`); return report; }
-
-  const pack = await buildResearchPack(db, pickDate, prices);
-  report.research = { chars: pack.body.length, sources: pack.sources.length };
-
-  const { data: already, error: aErr } = await db.from("stock_picks").select("ai_model_id").eq("pick_date", pickDate);
+  const { data: already, error: aErr } = await db.from("stock_picks").select("ai_model_id, market_category").eq("pick_date", pickDate);
   if (aErr) throw new Error(`today's picks: ${aErr.message}`);
-  const done = new Set((already ?? []).map((r) => r.ai_model_id as string));
+  const done = new Set((already ?? []).map((r) => `${r.market_category}|${r.ai_model_id}`));
 
   const expiry = new Date(now.getTime() + HOLD_DAYS * 86_400_000);
   const expiryDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(expiry);
 
+  for (const market of markets) {
+  let prices: Map<string, number>;
+  try {
+    prices = await pricesFor(market);
+  } catch (e) {
+    report.errors.push(`${market} prices: ${e instanceof Error ? e.message : String(e)}`);
+    continue;
+  }
+  report.prices += prices.size;
+  if (prices.size < 5) { report.errors.push(`${market}: only ${prices.size} prices available`); continue; }
+
+  const pack = await buildResearchPack(db, pickDate, market, prices);
+  report.research = { chars: (report.research?.chars ?? 0) + pack.body.length, sources: (report.research?.sources ?? 0) + pack.sources.length };
+
   for (const model of active) {
-    if (done.has(model.id)) { report.skipped.push(`${model.display_name} (already picked today)`); continue; }
+    if (done.has(`${market}|${model.id}`)) { report.skipped.push(`${model.display_name} / ${market}`); continue; }
     report.attempted++;
     const record = await modelRecord(db, model.id);
     const r = await javariGenerate({
       purpose: PICK_PURPOSE, model: model.javari_model, system: SYSTEM_PROMPT,
-      user: buildUserPrompt(model, pack.body, record),
+      user: buildUserPrompt(model, market, pack.body, record),
       maxOutputTokens: model.max_output_tokens, reasoningEffort: model.reasoning_effort, timeoutMs: model.timeout_ms,
     });
     if (!r.ok) {
@@ -249,7 +316,8 @@ export async function runDailyBattle(db: Db, now: Date): Promise<BattleReport> {
     })).digest("hex");
 
     const { error } = await db.from("stock_picks").insert({
-      ai_model_id: model.id, ticker: p.symbol, symbol: p.symbol, category: "stocks", asset_type: "stock",
+      ai_model_id: model.id, ticker: p.symbol, symbol: p.symbol, category: market, market_category: market,
+      asset_type: market === "crypto" ? "crypto" : "stock",
       direction: "UP", confidence: p.confidence, entry_price: parsed.entry, current_price: parsed.entry,
       target_price: p.target_price, stop_loss: p.stop_loss,
       reasoning: p.thesis, reasoning_summary: clip(p.thesis, 220),
@@ -267,6 +335,7 @@ export async function runDailyBattle(db: Db, now: Date): Promise<BattleReport> {
     report.saved++;
     const { error: logErr } = await db.from("market_pick_attempts").insert({ pick_date: pickDate, ai_model_id: model.id, ok: true, javari_request_id: r.requestId });
     if (logErr) report.errors.push(`attempt log: ${logErr.message}`);
+  }
   }
   return report;
 }
