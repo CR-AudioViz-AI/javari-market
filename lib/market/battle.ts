@@ -118,6 +118,10 @@ const Reply = z.object({
   key_factors: z.array(z.string().trim().max(300)).min(1).max(8),
   risks: z.array(z.string().trim().max(300)).max(8).default([]),
   sources_used: z.array(z.coerce.number().int().min(1).max(40)).max(12).default([]),
+  // 2026-09-12: how this pick ranks against everything the model can see today, so a
+  // routine pick and a strong idea are not scored as if they were the same thing.
+  conviction: z.coerce.number().int().min(1).max(10).catch(5).default(5),
+  what_would_make_me_wrong: z.string().trim().max(600).default(""),
 });
 export type ParsedPick = z.infer<typeof Reply>;
 
@@ -157,10 +161,22 @@ export async function buildResearchPack(db: Db, pickDate: string, market: Market
     return { body: have.body as string, sources: src.success ? src.data : [], sha: have.sha256 as string };
   }
 
-  const lines: string[] = [`## ${MARKETS[market].label} - today's prices`];
+  const lines: string[] = [`## ${MARKETS[market].label} - today's prices (you are choosing from these)`];
   for (const sym of MARKETS[market].symbols) {
     const p = prices.get(sym);
     if (p !== undefined) lines.push(`- ${sym}: $${p.toFixed(2)}`);
+  }
+
+  // 2026-09-12 (Roy): every model sees the FULL book - what every market is priced at
+  // today, and the complete outcome history of the contest - so its decision rests on
+  // all the evidence rather than one slice of it.
+  const others = MARKET_IDS.filter((m) => m !== market);
+  for (const m of others) {
+    try {
+      const p = await pricesFor(m);
+      if (p.size) lines.push("", `## ${MARKETS[m].label} - context only, not today's choices`,
+        [...p.entries()].map(([sym, v]) => `${sym} $${v < 10 ? v.toFixed(4) : v.toFixed(2)}`).join(" · "));
+    } catch { /* a missing context market must not stop the pick */ }
   }
 
   // Recent closed picks tell every model how this contest has actually gone.
@@ -169,11 +185,31 @@ export async function buildResearchPack(db: Db, pickDate: string, market: Market
     .eq("status", "closed").eq("market_category", market).order("closed_at", { ascending: false }).limit(8);
   if (rErr) throw new Error(`recent picks: ${rErr.message}`);
   if ((recent ?? []).length) {
-    lines.push("", "## How recent contest picks turned out");
+    lines.push("", `## How recent ${MARKETS[market].label} picks turned out`);
     for (const p of recent ?? []) {
       const pct = p.profit_loss_percent === null ? "?" : `${Number(p.profit_loss_percent) >= 0 ? "+" : ""}${Number(p.profit_loss_percent).toFixed(1)}%`;
       lines.push(`- ${p.symbol} picked ${p.direction} on ${p.pick_date}: ${pct}`);
     }
+  }
+
+  // The whole contest's record, across every market and every model. Deliberately only
+  // CLOSED picks: showing what rivals chose today would invite copying, and the point
+  // is six independent judgements.
+  const { data: history, error: hErr } = await db.from("stock_picks")
+    .select("symbol, market_category, confidence, profit_loss_percent, result, pick_date, ai_model_id")
+    .eq("status", "closed").not("javari_request_id", "is", null).order("closed_at", { ascending: false }).limit(120);
+  if (hErr) throw new Error(`history: ${hErr.message}`);
+  if ((history ?? []).length) {
+    const { data: models } = await db.from("ai_models").select("id, display_name");
+    const nameOf = new Map((models ?? []).map((m) => [m.id as string, m.display_name as string]));
+    lines.push("", "## Every closed pick in the contest so far (all models, all markets)");
+    for (const h of history ?? []) {
+      const pct = h.profit_loss_percent === null ? "?" : `${Number(h.profit_loss_percent) >= 0 ? "+" : ""}${Number(h.profit_loss_percent).toFixed(1)}%`;
+      lines.push(`- ${h.pick_date} ${h.market_category} ${h.symbol} by ${nameOf.get(h.ai_model_id as string) ?? "a model"} at ${h.confidence}% confidence: ${pct}`);
+    }
+    const wins = (history ?? []).filter((h) => h.result === "win").length;
+    const closed = (history ?? []).length;
+    lines.push(`Contest-wide: ${wins} of ${closed} closed picks finished up (${Math.round((wins / closed) * 100)}%).`);
   }
 
   const sources: Source[] = [];
@@ -208,14 +244,17 @@ export async function buildResearchPack(db: Db, pickDate: string, market: Market
 }
 
 // ── Prompt ───────────────────────────────────────────────────────────────────
-export const SYSTEM_PROMPT = `You are competing in Javari Market Oracle, a contest in which several AI models each pick one stock per day and are ranked publicly on how those picks actually perform. Entertainment and research only - no investment advice, no real money.
+export const SYSTEM_PROMPT = `You are competing in Javari Market Oracle, a contest in which several AI models each pick one symbol per market per day and are ranked publicly on how those picks actually perform. Research only - no investment advice, no real money.
 
-Pick the ONE symbol from today's list you believe will rise most over the next ${HOLD_DAYS} days. Judge it on the research pack and your own market knowledge: company fundamentals, momentum, sector conditions, news and risk.
+Decide INDEPENDENTLY. You are given the full book: today's prices in every market, and every closed pick in the contest so far with its outcome. Reach your own conclusion from that evidence. Other models are answering the same question separately; you are not told what they chose today, and you should not try to guess it. If your reasoning leads somewhere unpopular, say so - a contest where every model gives the same answer teaches nobody anything.
+
+Pick the ONE symbol from today's list you believe will rise most over the next ${HOLD_DAYS} days. Judge it on the full research pack and your own market knowledge: fundamentals, momentum, sector conditions, news, and what the contest's own history shows about which kinds of picks have worked.
 
 Rules:
 - Choose only from the symbols listed with a price today.
 - Your target price must be ABOVE today's price and your stop loss BELOW it.
-- Confidence must reflect how sure you really are, not how interesting the story is.
+- Confidence must reflect how sure you really are, not how interesting the story is. Low confidence is a valid answer and costs you nothing.
+- Say what would have to be true for you to be wrong.
 - Reply with ONE JSON object and nothing else - no markdown, no code fences.`;
 
 export function buildUserPrompt(model: BattleModel, market: MarketId, pack: string, record: { picks: number; wins: number; losses: number }): string {
@@ -237,7 +276,9 @@ Reply with exactly this JSON:
   "thesis": "two or three sentences: why this one rises over the next ${HOLD_DAYS} days",
   "key_factors": ["the specific reasons behind the pick"],
   "risks": ["what could go wrong"],
-  "sources_used": [numbers of the [S#] news items you relied on]
+  "sources_used": [numbers of the [S#] news items you relied on],
+  "conviction": integer 1-10 - how strong this idea is against everything you can see today, independent of confidence,
+  "what_would_make_me_wrong": "the specific thing that would break this call"
 }`;
 }
 
@@ -321,7 +362,9 @@ export async function runDailyBattle(db: Db, now: Date, markets: MarketId[] = MA
       direction: "UP", confidence: p.confidence, entry_price: parsed.entry, current_price: parsed.entry,
       target_price: p.target_price, stop_loss: p.stop_loss,
       reasoning: p.thesis, reasoning_summary: clip(p.thesis, 220),
-      key_factors: p.key_factors, risk_factors: p.risks,
+      key_factors: p.key_factors,
+      risk_factors: p.what_would_make_me_wrong ? [...p.risks, `Would be wrong if: ${p.what_would_make_me_wrong}`] : p.risks,
+      conviction: p.conviction,
       status: "active", pick_date: pickDate, expiry_date: expiryDate,
       javari_request_id: r.requestId, research_sha256: pack.sha, seal_sha256: seal,
       sources: used.map((s) => ({ title: s.title, url: s.url, site: s.site })),
