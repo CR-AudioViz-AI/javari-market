@@ -88,14 +88,129 @@ async function sp500Symbols(): Promise<string[]> {
   return [...new Set(symbols)];
 }
 
+/**
+ * The Nasdaq-100. Fetched from nasdaq.com when it answers; that endpoint replies from a
+ * desktop but times out from Vercel's network, so this dated copy (12 Sep 2026, 102
+ * constituents) is the fallback. The index is reconstituted annually, and changes are
+ * public news, so a stale copy is visible rather than silent.
+ */
+const NASDAQ_100: string[] = [
+  "AAPL",
+  "ABNB",
+  "ADBE",
+  "ADI",
+  "ADP",
+  "ADSK",
+  "AEP",
+  "ALAB",
+  "ALNY",
+  "AMAT",
+  "AMD",
+  "AMGN",
+  "AMZN",
+  "APP",
+  "ARM",
+  "ASML",
+  "AVGO",
+  "AXON",
+  "BKNG",
+  "BKR",
+  "CCEP",
+  "CDNS",
+  "CEG",
+  "CMCSA",
+  "COST",
+  "CPRT",
+  "CRWD",
+  "CRWV",
+  "CSCO",
+  "CSX",
+  "CTAS",
+  "DASH",
+  "DDOG",
+  "DXCM",
+  "EXC",
+  "FANG",
+  "FAST",
+  "FER",
+  "FTNT",
+  "GEHC",
+  "GILD",
+  "GOOG",
+  "GOOGL",
+  "HON",
+  "HONA",
+  "IDXX",
+  "INTC",
+  "INTU",
+  "ISRG",
+  "KDP",
+  "KHC",
+  "KLAC",
+  "LIN",
+  "LITE",
+  "LRCX",
+  "MAR",
+  "MCHP",
+  "MDLZ",
+  "MELI",
+  "META",
+  "MNST",
+  "MPWR",
+  "MRVL",
+  "MSFT",
+  "MSTR",
+  "MU",
+  "NBIS",
+  "NFLX",
+  "NVDA",
+  "NXPI",
+  "ODFL",
+  "ORLY",
+  "PANW",
+  "PAYX",
+  "PCAR",
+  "PDD",
+  "PEP",
+  "PLTR",
+  "PYPL",
+  "QCOM",
+  "REGN",
+  "RKLB",
+  "ROP",
+  "ROST",
+  "SBUX",
+  "SHOP",
+  "SNDK",
+  "SNPS",
+  "SPCX",
+  "STX",
+  "TER",
+  "TMUS",
+  "TRI",
+  "TSLA",
+  "TTWO",
+  "TXN",
+  "VRTX",
+  "WBD",
+  "WDAY",
+  "WDC",
+  "WMT",
+  "XEL",
+];
+
 async function nasdaq100Symbols(): Promise<string[]> {
-  const res = await fetch("https://api.nasdaq.com/api/quote/list-type/nasdaq100", { headers: UA, cache: "no-store", signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) throw new Error(`Nasdaq-100 HTTP ${res.status}`);
-  const json = (await res.json()) as { data?: { data?: { rows?: { symbol?: string }[] } } };
-  const symbols = (json.data?.data?.rows ?? []).map((r) => (r.symbol ?? "").trim().toUpperCase()).filter(Boolean);
-  if (symbols.length < 90) throw new Error(`Nasdaq-100 returned only ${symbols.length} symbols`);
-  return [...new Set(symbols)];
+  try {
+    const res = await fetch("https://api.nasdaq.com/api/quote/list-type/nasdaq100", { headers: UA, cache: "no-store", signal: AbortSignal.timeout(12_000) });
+    if (res.ok) {
+      const json = (await res.json()) as { data?: { data?: { rows?: { symbol?: string }[] } } };
+      const live = (json.data?.data?.rows ?? []).map((r) => (r.symbol ?? "").trim().toUpperCase()).filter(Boolean);
+      if (live.length >= 90) return [...new Set(live)];
+    }
+  } catch { /* fall through to the dated copy */ }
+  return NASDAQ_100;
 }
+
 
 async function cryptoTop100(): Promise<UniverseRow[]> {
   const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1", {
