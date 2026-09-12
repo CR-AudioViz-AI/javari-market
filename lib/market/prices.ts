@@ -112,3 +112,28 @@ export async function getStockPrices(tickers: string[]): Promise<Map<string, num
 export async function getStockPrice(ticker: string): Promise<number | null> {
   return (await getStockPrices([ticker])).get(ticker.trim().toUpperCase()) ?? null;
 }
+
+
+/**
+ * Company names for a set of tickers, from the same Yahoo chart endpoint the prices come
+ * from (its metadata carries longName). 2026-09-12: the index universes stored no names,
+ * so searching "Apple" or "Chevron" on the pick page found nothing - only tickers worked.
+ * Failures are silent by design: a missing name must never cost a universe its symbol.
+ */
+export async function getStockNames(tickers: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const groups = chunk(tickers, 12);
+  for (const group of groups) {
+    await Promise.all(group.map(async (sym) => {
+      try {
+        const data = (await getJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`)) as {
+          chart?: { result?: { meta?: { longName?: string; shortName?: string } }[] };
+        };
+        const meta = data.chart?.result?.[0]?.meta;
+        const name = meta?.longName ?? meta?.shortName;
+        if (name) out.set(sym.toUpperCase(), name);
+      } catch { /* a name is a convenience, never a blocker */ }
+    }));
+  }
+  return out;
+}

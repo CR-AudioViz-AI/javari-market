@@ -20,7 +20,7 @@
 // CR AudioViz AI, LLC · EIN 39-3646201
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getStockPrices } from "@/lib/market/prices";
+import { getStockNames, getStockPrices } from "@/lib/market/prices";
 
 export type UniverseRow = { symbol: string; name: string | null; price: number | null; volume: number | null; marketCap: number | null };
 export type UniverseCategory = "sp500" | "nasdaq" | "dow" | "penny" | "crypto";
@@ -255,9 +255,9 @@ export async function buildUniverse(category: UniverseCategory): Promise<Univers
   // screen, which genuinely needs to scan every listing, still does.
   if (category !== "penny") {
     const members = category === "dow" ? DOW_65 : category === "nasdaq" ? await nasdaq100Symbols() : await sp500Symbols();
-    const prices = await getStockPrices(members);
+    const [prices, names] = await Promise.all([getStockPrices(members), getStockNames(members)]);
     return members
-      .map((symbol) => ({ symbol, name: null, price: prices.get(symbol) ?? null, volume: null, marketCap: null }))
+      .map((symbol) => ({ symbol, name: names.get(symbol) ?? null, price: prices.get(symbol) ?? null, volume: null, marketCap: null }))
       .filter((r) => r.price !== null);
   }
 

@@ -175,22 +175,43 @@ export function MyPicksPanel() {
                 inputMode="search"
                 value={query[market] ?? ""}
                 onChange={(e) => setQuery((q) => ({ ...q, [market]: e.target.value }))}
-                placeholder={`Search ${u.symbols.length} symbols — ticker or company`}
+                placeholder={`Search ${u.symbols.length} — ticker or company name`}
                 className="mt-2 w-full rounded-md bg-black/40 px-3 py-3 text-white ring-1 ring-white/15"
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 {(() => {
                   const q = (query[market] ?? "").trim().toUpperCase();
+                  // 2026-09-12: ticker OR company name, with the closest matches first -
+                  // typing "apple" should put AAPL at the front, not bury it behind every
+                  // company whose name happens to contain the word.
+                  const score = (x: Sym): number => {
+                    const name = (x.name ?? "").toUpperCase();
+                    if (x.symbol === q) return 0;
+                    if (x.symbol.startsWith(q)) return 1;
+                    if (name.startsWith(q)) return 2;
+                    if (name.split(/[^A-Z0-9]+/).some((w) => w.startsWith(q))) return 3;
+                    if (x.symbol.includes(q)) return 4;
+                    if (name.includes(q)) return 5;
+                    return 99;
+                  };
                   const matches = q
-                    ? u.symbols.filter((x) => x.symbol.includes(q) || (x.name ?? "").toUpperCase().includes(q)).slice(0, 24)
+                    ? u.symbols
+                        .map((x) => ({ x, s: score(x) }))
+                        .filter((m) => m.s < 99)
+                        .sort((a, b) => a.s - b.s || a.x.symbol.localeCompare(b.x.symbol))
+                        .slice(0, 24)
+                        .map((m) => m.x)
                     : u.symbols.slice(0, 12);
                   if (!matches.length) return <p className="text-sm text-gray-400">Nothing in {u.label} matches “{query[market]}”.</p>;
                   return matches.map((x) => (
                     <button key={x.symbol} type="button" onClick={() => void choose(market, x.symbol)} aria-pressed={picks[market] === x.symbol}
                       title={x.name ?? x.symbol}
-                      className={`min-h-[2.75rem] rounded-lg px-3 text-sm ring-1 ${picks[market] === x.symbol ? "bg-sky-500/20 font-semibold text-white ring-2 ring-sky-400" : "text-gray-200 ring-white/15 active:bg-white/10"}`}>
-                      {x.symbol}
-                      {x.price !== null && <span className="ml-1 text-xs text-gray-400">{x.price < 10 ? x.price.toFixed(2) : Math.round(x.price)}</span>}
+                      className={`flex min-h-[2.75rem] flex-col justify-center rounded-lg px-3 py-1 text-left text-sm ring-1 ${picks[market] === x.symbol ? "bg-sky-500/20 font-semibold text-white ring-2 ring-sky-400" : "text-gray-200 ring-white/15 active:bg-white/10"}`}>
+                      <span className="flex items-baseline gap-1">
+                        <span className="font-semibold">{x.symbol}</span>
+                        {x.price !== null && <span className="text-xs text-gray-400">{x.price < 10 ? x.price.toFixed(2) : Math.round(x.price)}</span>}
+                      </span>
+                      {x.name && <span className="max-w-[11rem] truncate text-[11px] text-gray-400">{x.name}</span>}
                     </button>
                   ));
                 })()}
