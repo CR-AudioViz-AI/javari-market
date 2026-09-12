@@ -46,8 +46,14 @@ function money(v: unknown): number | null {
 
 type ScreenerRow = { symbol?: string; name?: string; lastsale?: string; volume?: string; marketCap?: string; sector?: string };
 
+// 2026-09-12: memoised for the life of the process. Without this, building four stock
+// universes meant four downloads of all 7,000 US listings and the run timed out.
+let screenerCache: { at: number; rows: Map<string, UniverseRow> } | null = null;
+const SCREENER_TTL_MS = 30 * 60_000;
+
 /** Every US listing with a price, from one free call. */
 async function screener(): Promise<Map<string, UniverseRow>> {
+  if (screenerCache && Date.now() - screenerCache.at < SCREENER_TTL_MS) return screenerCache.rows;
   const res = await fetch("https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&download=true", {
     headers: UA, cache: "no-store", signal: AbortSignal.timeout(45_000),
   });
@@ -67,6 +73,7 @@ async function screener(): Promise<Map<string, UniverseRow>> {
       marketCap: money(r.marketCap),
     });
   }
+  screenerCache = { at: Date.now(), rows: out };
   return out;
 }
 
@@ -134,8 +141,25 @@ export async function getUniverse(db: SupabaseClient, category: UniverseCategory
       marketCap: r.market_cap === null ? null : Number(r.market_cap),
     }));
   }
-  const rows = await buildUniverse(category);
-  if (!rows.length) throw new Error(`universe for ${category} came back empty`);
+  let rows: UniverseRow[];
+  try {
+    rows = await buildUniverse(category);
+    if (!rows.length) throw new Error("came back empty");
+  } catch (e) {
+    // A source being slow or down must not stop a day's picks: fall back to the most
+    // recent snapshot, which is a real universe, just a day or two old.
+    const { data: prev, error: pErr } = await db.from("market_universe").select("symbol, name, price, volume, market_cap, snapshot_date")
+      .eq("category", category).order("snapshot_date", { ascending: false }).limit(1200);
+    if (pErr) throw new Error(`universe fallback read: ${pErr.message}`);
+    if (!(prev ?? []).length) throw new Error(`universe for ${category} unavailable: ${e instanceof Error ? e.message : String(e)}`);
+    const newest = String(prev![0]!.snapshot_date);
+    return (prev ?? []).filter((r) => String(r.snapshot_date) === newest).map((r) => ({
+      symbol: String(r.symbol), name: r.name === null ? null : String(r.name),
+      price: r.price === null ? null : Number(r.price),
+      volume: r.volume === null ? null : Number(r.volume),
+      marketCap: r.market_cap === null ? null : Number(r.market_cap),
+    }));
+  }
   const { error: insErr } = await db.from("market_universe").upsert(
     rows.map((r) => ({
       snapshot_date: snapshotDate, category, symbol: r.symbol, name: r.name,

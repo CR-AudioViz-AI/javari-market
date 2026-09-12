@@ -8,6 +8,10 @@
   },
   "crons": [
     {
+      "path": "/api/cron/universe",
+      "schedule": "15 13 * * 1-5"
+    },
+    {
       "path": "/api/cron/daily-battle",
       "schedule": "30 13 * * 1-5"
     },
