@@ -298,9 +298,10 @@ export async function GET(request: NextRequest) {
 
         if (pick.benchmark_symbol && pick.benchmark_entry) {
           try {
-            const benchNow = pick.benchmark_symbol === 'BTC'
-              ? (await (await import('@/lib/market/battle')).pricesFor('crypto')).get('BTC') ?? null
-              : await getStockPrice(pick.benchmark_symbol as string);
+            // 2026-09-12: resolved through lib/market/benchmarks so the composite Dow and
+            // the total crypto market cap are measured the same way they were recorded.
+            const { benchmarkValue } = await import('@/lib/market/benchmarks');
+            const benchNow = await benchmarkValue(pick.benchmark_symbol as never);
             if (benchNow) {
               const benchReturn = ((benchNow - Number(pick.benchmark_entry)) / Number(pick.benchmark_entry)) * 100;
               updateData.benchmark_current = benchNow;
@@ -375,10 +376,8 @@ export async function GET(request: NextRequest) {
         const benchSymbol = battle.BENCHMARKS[market];
         if (!benchCache.has(benchSymbol)) {
           try {
-            const bp = benchSymbol === 'BTC'
-              ? (await battle.pricesFor('crypto')).get('BTC') ?? null
-              : await getStockPrice(benchSymbol);
-            benchCache.set(benchSymbol, bp);
+            const { benchmarkValue } = await import('@/lib/market/benchmarks');
+            benchCache.set(benchSymbol, await benchmarkValue(benchSymbol as never));
           } catch { benchCache.set(benchSymbol, null); }
         }
         const { data: benchRow } = await supabase

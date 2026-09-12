@@ -20,6 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStockPrices } from "@/lib/market/prices";
 import { getUniverse, universeTable, type UniverseRow } from "@/lib/market/universe";
 import { javariGenerate, javariResearch } from "@/lib/javari/door";
+import { BENCHMARK_FOR, benchmarkValue, type BenchmarkId } from "@/lib/market/benchmarks";
 
 /** The five markets. Every model picks once per market per day. 2026-09-12 */
 /**
@@ -81,10 +82,11 @@ export const STOCK_POOL: string[] = [];
 
 const PICK_PURPOSE = "market_pick";
 
-/** What each market has to beat. A pick that rises while its index rises more is not a win.
- *  2026-09-12 */
+/** What each market has to beat - see lib/market/benchmarks.ts. 2026-09-12 */
 export const BENCHMARKS: Record<MarketId, string> = {
-  sp500: "SPY", nasdaq: "QQQ", dow: "DIA", penny: "IWM", crypto: "BTC",
+  sp500: BENCHMARK_FOR.sp500 as string, nasdaq: BENCHMARK_FOR.nasdaq as string,
+  dow: BENCHMARK_FOR.dow as string, penny: BENCHMARK_FOR.penny as string,
+  crypto: BENCHMARK_FOR.crypto as string,
 };
 const HOLD_DAYS = 7;
 
@@ -325,14 +327,15 @@ export async function runDailyBattle(db: Db, now: Date, markets: MarketId[] = MA
   if (prices.size < 5) { report.errors.push(`${market}: only ${prices.size} prices available`); continue; }
 
   // The benchmark's price today, stored once per market per day.
-  const benchSymbol = BENCHMARKS[market];
+  const benchSymbol = BENCHMARK_FOR[market] as BenchmarkId;
   let benchEntry: number | null = null;
   try {
-    const bench = benchSymbol === "BTC" ? await pricesFor("crypto", ["BTC"]) : await getStockPrices([benchSymbol]);
-    benchEntry = bench.get(benchSymbol) ?? null;
+    benchEntry = await benchmarkValue(benchSymbol);
     if (benchEntry !== null) {
       const { error: bErr } = await db.from("market_benchmark_prices").upsert({ pick_date: pickDate, symbol: benchSymbol, price: benchEntry }, { onConflict: "pick_date,symbol" });
       if (bErr) report.errors.push(`benchmark price: ${bErr.message}`);
+    } else {
+      report.errors.push(`${market}: benchmark ${benchSymbol} unavailable - picks will be unscored`);
     }
   } catch (e) {
     report.errors.push(`${market} benchmark: ${e instanceof Error ? e.message : String(e)}`);

@@ -37,7 +37,7 @@ export default async function HowItWorks() {
         </ul>
 
         <h2 className="mt-8 text-xl font-semibold text-white">How a pick is judged</h2>
-        <p className="mt-2">Every pick is scored against its market&rsquo;s index over the same seven days: S&amp;P 500 picks against SPY, Nasdaq against QQQ, Dow against DIA, penny stocks against IWM, crypto against Bitcoin. The difference is what we rank on. A pick that rose 2% while its index rose 3% lost ground, and we say so.</p>
+        <p className="mt-2">Every pick is scored against its market&rsquo;s index over the same seven days: S&amp;P 500 picks against SPY, Nasdaq against QQQ, the Dow Composite against a 30/20/15 blend of DIA, IYT and IDU, penny stocks against IWM, and crypto against the total crypto market capitalisation. The difference is what we rank on. A pick that rose 2% while its index rose 3% lost ground, and we say so.</p>
         <p className="mt-2">Each model also states a conviction score from 1 to 10 &mdash; how strong it rates the idea against everything it can see &mdash; and what would have to happen for it to be wrong. Those are recorded before the outcome is known.</p>
 
         <h2 className="mt-8 text-xl font-semibold text-white">Fairness</h2>
