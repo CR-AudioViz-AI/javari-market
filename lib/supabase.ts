@@ -163,7 +163,11 @@ export async function getPicks(opts: {
   status?: 'active' | 'closed'
   limit?: number
 } = {}): Promise<Pick[]> {
-  const sb = getSupabaseAdmin()
+  // 2026-09-11: was getSupabaseAdmin(). These helpers run in CLIENT components, where
+  // the secret key is deliberately empty - supabase-js then threw "supabaseKey is
+  // required" and eleven pages showed nothing. Published contest data is readable with
+  // the publishable key under RLS, which is what a browser should be using anyway.
+  const sb = getSupabase()
   let q = sb.from('stock_picks').select('*').order('pick_date', { ascending: false })
   if (opts.assetType) q = q.eq('asset_type', opts.assetType)
   if (opts.status) q = q.eq('status', opts.status)
@@ -174,7 +178,7 @@ export async function getPicks(opts: {
 }
 
 export async function getAIModels(): Promise<AIModel[]> {
-  const sb = getSupabaseAdmin()
+  const sb = getSupabase()
   const { data, error } = await sb
     .from('ai_models')
     .select('*')
@@ -207,7 +211,7 @@ export async function getAIStatistics(assetType?: AssetType): Promise<AIStatisti
 }
 
 export async function getHotPicks(limit = 10, assetType?: AssetType): Promise<Pick[]> {
-  const sb = getSupabaseAdmin()
+  const sb = getSupabase()
   let q = sb
     .from('stock_picks')
     .select('*')
@@ -221,7 +225,7 @@ export async function getHotPicks(limit = 10, assetType?: AssetType): Promise<Pi
 }
 
 export async function getOverallStats(): Promise<OverallStats> {
-  const sb = getSupabaseAdmin()
+  const sb = getSupabase()
   const [{ data: picks }, { data: models }] = await Promise.all([
     sb.from('stock_picks').select('status, result'),
     sb.from('ai_models').select('id, total_picks'),
@@ -241,7 +245,7 @@ export async function getOverallStats(): Promise<OverallStats> {
 }
 
 export async function getRecentWinners(limit = 5, assetType?: AssetType): Promise<Pick[]> {
-  const sb = getSupabaseAdmin()
+  const sb = getSupabase()
   let q = sb
     .from('stock_picks')
     .select('*')
