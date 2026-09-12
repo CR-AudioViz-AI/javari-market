@@ -19,8 +19,12 @@ let browserClient: SupabaseClient | null = null
 
 export function createClient(): SupabaseClient {
   if (browserClient) return browserClient
-  const url = supabaseUrl()
-  const key = publishableKey()
+  // 2026-09-11: same inlining rule as lib/supabase.ts - the literal names must appear here.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl()
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    publishableKey()
   if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
   if (!key) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set')
   browserClient = createSupabaseClient(url, key, {

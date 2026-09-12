@@ -28,7 +28,9 @@ interface ClusterAlert {
 interface InsiderData {
   transactions: InsiderTransaction[];
   clusters: ClusterAlert[];
-  statistics: { totalBuys: number; totalSells: number; buyValue: number; sellValue: number; ratio: number };
+  // 2026-09-11: the API returns `stats` with these names. The page read a
+  // `statistics` object that has never existed, so it crashed on load.
+  stats: { totalTransactions: number; buys: number; sells: number; exercises: number; totalBuyValue: number; totalSellValue: number; bullishSignals: number; bearishSignals: number };
   notable: InsiderTransaction[];
 }
 
@@ -96,20 +98,20 @@ export default function InsiderTradingPage() {
                 <div className="text-gray-400 text-sm flex items-center gap-1">
                   <TrendingUp className="w-4 h-4 text-green-400" /> Buys
                 </div>
-                <div className="text-2xl font-bold text-green-400">{data.statistics.totalBuys}</div>
-                <div className="text-sm text-gray-500">{formatValue(data.statistics.buyValue)}</div>
+                <div className="text-2xl font-bold text-green-400">{data.stats.buys}</div>
+                <div className="text-sm text-gray-500">{formatValue(data.stats.totalBuyValue)}</div>
               </div>
               <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
                 <div className="text-gray-400 text-sm flex items-center gap-1">
                   <TrendingDown className="w-4 h-4 text-red-400" /> Sells
                 </div>
-                <div className="text-2xl font-bold text-red-400">{data.statistics.totalSells}</div>
-                <div className="text-sm text-gray-500">{formatValue(data.statistics.sellValue)}</div>
+                <div className="text-2xl font-bold text-red-400">{data.stats.sells}</div>
+                <div className="text-sm text-gray-500">{formatValue(data.stats.totalSellValue)}</div>
               </div>
               <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
                 <div className="text-gray-400 text-sm">Buy/Sell Ratio</div>
-                <div className={`text-2xl font-bold ${data.statistics.ratio > 1 ? 'text-green-400' : 'text-red-400'}`}>
-                  {data.statistics.ratio.toFixed(2)}x
+                <div className={`text-2xl font-bold ${(data.stats.sells ? data.stats.buys / data.stats.sells : 0) > 1 ? 'text-green-400' : 'text-red-400'}`}>
+                  {(data.stats.sells ? data.stats.buys / data.stats.sells : 0).toFixed(2)}x
                 </div>
               </div>
               <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">

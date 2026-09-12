@@ -9,10 +9,12 @@ interface EarningsEvent {
   name: string;
   date: string;
   time: string;
-  estimate: number | null;
+  estimate?: number | null;
+  epsEstimate?: number | null;
   actual: number | null;
   surprise: number | null;
-  surprisePercent: number | null;
+  surprisePercent?: number | null;
+  epsSurprisePercent?: number | null;
   status: 'upcoming' | 'reported';
   impact: 'high' | 'medium' | 'low';
 }
@@ -138,7 +140,7 @@ export default function EarningsCalendarPage() {
                           <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
                             <div className="flex items-center gap-3">
                               <span className={`text-xs px-2 py-0.5 rounded border ${getImpactColor(event.impact)}`}>
-                                {event.impact.toUpperCase()}
+                                {(event.impact ?? 'normal').toUpperCase()}
                               </span>
                               <Link href={`/stock/${event.symbol}`} className="font-semibold text-blue-400 hover:text-blue-300">
                                 {event.symbol}
@@ -150,17 +152,23 @@ export default function EarningsCalendarPage() {
                                 <Clock className="w-3 h-3" />
                                 {event.time}
                               </span>
-                              {event.status === 'reported' && event.surprisePercent !== null && (
-                                <span className={`text-sm font-medium ${getSurpriseColor(event.surprisePercent)}`}>
-                                  {event.surprisePercent > 0 ? '+' : ''}{event.surprisePercent.toFixed(1)}%
-                                  {event.surprisePercent > 0 ? ' Beat' : ' Miss'}
-                                </span>
-                              )}
-                              {event.status === 'upcoming' && event.estimate && (
-                                <span className="text-sm text-gray-400">
-                                  Est: ${event.estimate.toFixed(2)}
-                                </span>
-                              )}
+                              {/* 2026-09-11: the API calls these epsSurprisePercent / epsEstimate
+                                  and leaves them null for most events. The page read
+                                  surprisePercent directly and crashed on the first null. */}
+                              {(() => {
+                                const surprise = event.surprisePercent ?? event.epsSurprisePercent;
+                                return typeof surprise === 'number' ? (
+                                  <span className={`text-sm font-medium ${getSurpriseColor(surprise)}`}>
+                                    {surprise > 0 ? '+' : ''}{surprise.toFixed(1)}%{surprise > 0 ? ' Beat' : ' Miss'}
+                                  </span>
+                                ) : null;
+                              })()}
+                              {(() => {
+                                const est = event.estimate ?? event.epsEstimate;
+                                return typeof est === 'number' ? (
+                                  <span className="text-sm text-gray-400">Est: ${est.toFixed(2)}</span>
+                                ) : null;
+                              })()}
                             </div>
                           </div>
                         ))
@@ -205,8 +213,8 @@ export default function EarningsCalendarPage() {
                     <Link href={`/stock/${e.symbol}`} className="font-medium text-blue-400 hover:text-blue-300">
                       {e.symbol}
                     </Link>
-                    <span className={`text-sm font-medium ${getSurpriseColor(e.surprisePercent)}`}>
-                      {e.surprisePercent && e.surprisePercent > 0 ? '+' : ''}{e.surprisePercent?.toFixed(1)}%
+                    <span className={`text-sm font-medium ${getSurpriseColor(e.surprisePercent ?? e.epsSurprisePercent ?? null)}`}>
+                      {(() => { const v = e.surprisePercent ?? e.epsSurprisePercent; return typeof v === 'number' ? `${v > 0 ? '+' : ''}${v.toFixed(1)}%` : '—'; })()}
                     </span>
                   </div>
                 ))}

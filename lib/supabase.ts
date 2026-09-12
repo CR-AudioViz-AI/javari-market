@@ -5,8 +5,24 @@
 import { createClient as _create, SupabaseClient } from "@supabase/supabase-js"
 import { secretKey, publishableKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
-function getUrl() { return supabaseUrl() }
-function getAnon() { return publishableKey() }
+function getUrl() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl();
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set');
+  return url;
+}
+// 2026-09-11: read the NEXT_PUBLIC_* names DIRECTLY here. Next inlines a public env
+// var only where the literal `process.env.NEXT_PUBLIC_...` appears in compiled app code;
+// reading it through the SDK helper left the browser bundle with an empty string, and
+// eleven pages died with "supabaseKey is required" (watchlist, portfolio, battle,
+// crypto, penny-stocks, charts, alerts, backtest, export, insights, paper-trading).
+function getAnon() {
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    publishableKey();
+  if (!key) throw new Error('Supabase publishable key is not set (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)');
+  return key;
+}
 function getSvc() { return secretKey() ?? getAnon() }
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard

@@ -20,7 +20,7 @@ interface NewsData {
   articles: NewsArticle[];
   trendingTickers: Array<{ ticker: string; mentions: number }>;
   trendingKeywords: Array<{ keyword: string; count: number }>;
-  overallSentiment: { score: number; label: string };
+  summary: { totalArticles: number; sentiment: { overall: string; score: number; bullish: number; bearish: number; neutral: number }; trendingTickers?: { ticker: string; mentions: number }[] };
   sourceBreakdown: Record<string, number>;
 }
 
@@ -138,8 +138,8 @@ export default function NewsFeedPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
                 <div className="text-gray-400 text-sm">Overall Sentiment</div>
-                <div className={`text-2xl font-bold ${getSentimentColor(data.overallSentiment.score)}`}>
-                  {data.overallSentiment.label}
+                <div className={`text-2xl font-bold ${getSentimentColor(data.summary.sentiment.score)}`}>
+                  {data.summary.sentiment.overall}
                 </div>
               </div>
               <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
