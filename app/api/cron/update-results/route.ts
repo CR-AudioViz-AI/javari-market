@@ -309,6 +309,67 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // Step 2b: settle PLAYER picks on exactly the same terms as the models - same
+    // prices, same benchmark, same seven-day window. 2026-09-12: without this humans
+    // never scored at all, so the comparison could not have been honest.
+    try {
+      const { data: openPlayer, error: opErr } = await supabase
+        .from('market_player_picks')
+        .select('user_id, pick_date, category, symbol, entry_price')
+        .eq('status', 'active');
+      if (opErr) throw new Error(opErr.message);
+      const battle = await import('@/lib/market/battle');
+      const priceCache = new Map<string, Map<string, number>>();
+      const benchCache = new Map<string, number | null>();
+
+      for (const pk of openPlayer ?? []) {
+        const market = String(pk.category) as keyof typeof battle.MARKETS;
+        if (!priceCache.has(market)) {
+          try { priceCache.set(market, await battle.pricesFor(market)); } catch { priceCache.set(market, new Map()); }
+        }
+        const now = priceCache.get(market)?.get(String(pk.symbol));
+        const entry = Number(pk.entry_price);
+        if (!now || !entry) continue;
+
+        const held = (Date.now() - new Date(`${pk.pick_date}T14:30:00Z`).getTime()) / 86_400_000;
+        const ret = ((now - entry) / entry) * 100;
+
+        const benchSymbol = battle.BENCHMARKS[market];
+        if (!benchCache.has(benchSymbol)) {
+          try {
+            const bp = benchSymbol === 'BTC'
+              ? (await battle.pricesFor('crypto')).get('BTC') ?? null
+              : await getStockPrice(benchSymbol);
+            benchCache.set(benchSymbol, bp);
+          } catch { benchCache.set(benchSymbol, null); }
+        }
+        const { data: benchRow } = await supabase
+          .from('market_benchmark_prices').select('price').eq('pick_date', pk.pick_date).eq('symbol', benchSymbol).maybeSingle();
+        const benchNow = benchCache.get(benchSymbol) ?? null;
+        const benchEntry = benchRow ? Number(benchRow.price) : null;
+        const benchReturn = benchNow && benchEntry ? ((benchNow - benchEntry) / benchEntry) * 100 : null;
+
+        const closing = held >= 7;
+        const update: Record<string, unknown> = {
+          current_price: now,
+          return_percent: Number(ret.toFixed(4)),
+          benchmark_return: benchReturn === null ? null : Number(benchReturn.toFixed(4)),
+          alpha: benchReturn === null ? null : Number((ret - benchReturn).toFixed(4)),
+          updated_at: new Date().toISOString(),
+        };
+        if (closing) {
+          update.status = 'closed';
+          update.result = ret > 0 ? 'win' : ret < 0 ? 'loss' : 'flat';
+        }
+        const { error: upErr } = await supabase
+          .from('market_player_picks').update(update)
+          .eq('user_id', pk.user_id).eq('pick_date', pk.pick_date).eq('category', pk.category);
+        if (upErr) results.errors.push(`Player pick ${pk.symbol}: ${upErr.message}`);
+      }
+    } catch (e) {
+      results.errors.push(`Player settlement: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
     // Step 3: Update AI model leaderboard stats
     console.log(`[UPDATE RESULTS] Updating ${processedModelIds.size} AI model stats...`);
     

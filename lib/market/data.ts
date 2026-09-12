@@ -171,3 +171,89 @@ export async function getBoards(): Promise<{ pickDate: string | null; boards: Ma
   }
   return { pickDate, boards };
 }
+
+// ── One table, models and people together, scored identically. 2026-09-12 (Roy:
+//    "everyone signed up must be in the competition; all comparisons complete and honest")
+//
+// Honesty rules, applied to every competitor alike:
+//   * ranked on AVERAGE alpha per scored pick, so nobody gains by making more picks
+//   * a minimum number of scored picks before anyone is ranked - a single lucky call is
+//     not a record, and both models and people are held to the same bar
+//   * everyone with a pick appears, ranked or not; nobody can be hidden or withdrawn
+//   * open picks are counted and shown, so a competitor cannot look better by having
+//     most of their positions still running
+export const QUALIFYING_PICKS = 10;
+
+export type Competitor = {
+  kind: "model" | "person";
+  id: string; name: string; sub: string; color: string | null;
+  scored: number; open: number; totalPicks: number;
+  wins: number; losses: number; winRate: number | null;
+  avgAlpha: number | null; beatBenchmark: number; avgReturn: number | null;
+  qualified: boolean; rank: number | null;
+};
+
+export async function getCompetition(opts: { weekStart?: string } = {}): Promise<{ competitors: Competitor[]; qualifying: number }> {
+  const d = db();
+  const models = await getActiveModels();
+  const range = opts.weekStart
+    ? { from: opts.weekStart, to: new Date(new Date(`${opts.weekStart}T00:00:00Z`).getTime() + 6 * 86_400_000).toISOString().slice(0, 10) }
+    : null;
+
+  let modelQ = d.from("stock_picks").select("ai_model_id, status, result, profit_loss_percent, alpha, pick_date").not("javari_request_id", "is", null);
+  let playerQ = d.from("market_player_picks").select("user_id, status, result, return_percent, alpha, pick_date, market_players(handle, display_name)");
+  if (range) {
+    modelQ = modelQ.gte("pick_date", range.from).lte("pick_date", range.to);
+    playerQ = playerQ.gte("pick_date", range.from).lte("pick_date", range.to);
+  }
+  const [{ data: mp, error: mErr }, { data: pp, error: pErr }] = await Promise.all([modelQ, playerQ]);
+  if (mErr) throw new Error(mErr.message);
+  if (pErr) throw new Error(pErr.message);
+
+  const build = (
+    kind: "model" | "person", id: string, name: string, sub: string, color: string | null,
+    rows: { status: unknown; result: unknown; ret: number | null; alpha: number | null }[],
+  ): Competitor => {
+    const closed = rows.filter((r) => r.status === "closed");
+    const scoredRows = closed.filter((r) => r.alpha !== null);
+    const wins = closed.filter((r) => r.result === "win").length;
+    const losses = closed.filter((r) => r.result === "loss").length;
+    return {
+      kind, id, name, sub, color,
+      scored: scoredRows.length,
+      open: rows.filter((r) => r.status === "active").length,
+      totalPicks: rows.length,
+      wins, losses,
+      winRate: wins + losses ? (wins / (wins + losses)) * 100 : null,
+      avgAlpha: scoredRows.length ? scoredRows.reduce((s2, r) => s2 + Number(r.alpha), 0) / scoredRows.length : null,
+      beatBenchmark: scoredRows.filter((r) => Number(r.alpha) > 0).length,
+      avgReturn: closed.length ? closed.reduce((s2, r) => s2 + (r.ret ?? 0), 0) / closed.length : null,
+      qualified: scoredRows.length >= QUALIFYING_PICKS,
+      rank: null,
+    };
+  };
+
+  const competitors: Competitor[] = models.map((m) =>
+    build("model", m.id, m.display_name, m.provider, m.color,
+      (mp ?? []).filter((r) => r.ai_model_id === m.id)
+        .map((r) => ({ status: r.status, result: r.result, ret: r.profit_loss_percent === null ? null : Number(r.profit_loss_percent), alpha: r.alpha === null ? null : Number(r.alpha) }))));
+
+  const byUser = new Map<string, { handle: string; name: string; rows: { status: unknown; result: unknown; ret: number | null; alpha: number | null }[] }>();
+  for (const r of pp ?? []) {
+    const rel = (r as unknown as { market_players?: { handle: string; display_name: string } | { handle: string; display_name: string }[] }).market_players;
+    const profile = Array.isArray(rel) ? rel[0] : rel;
+    if (!profile) continue;
+    const e = byUser.get(profile.handle) ?? { handle: profile.handle, name: profile.display_name, rows: [] };
+    e.rows.push({ status: r.status, result: r.result, ret: r.return_percent === null ? null : Number(r.return_percent), alpha: r.alpha === null ? null : Number(r.alpha) });
+    byUser.set(profile.handle, e);
+  }
+  for (const u of byUser.values()) competitors.push(build("person", u.handle, u.name, `@${u.handle}`, null, u.rows));
+
+  const sorted = competitors.sort((a, b) => {
+    if (a.qualified !== b.qualified) return a.qualified ? -1 : 1;
+    return (b.avgAlpha ?? -999) - (a.avgAlpha ?? -999) || b.scored - a.scored || a.name.localeCompare(b.name);
+  });
+  let rank = 0;
+  for (const c of sorted) if (c.qualified) c.rank = ++rank;
+  return { competitors: sorted, qualifying: QUALIFYING_PICKS };
+}

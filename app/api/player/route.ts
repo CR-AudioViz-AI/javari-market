@@ -39,11 +39,27 @@ export async function GET(req: Request): Promise<NextResponse> {
     ]);
     if (pErr) throw new Error(pErr.message);
     if (kErr) throw new Error(kErr.message);
+
+    // 2026-09-12 (Roy): everyone signed up is in the competition. A first visit enrols
+    // you with a handle derived from your email; you can change it, but not opt out of
+    // being scored once you have made a pick.
+    let enrolled = profile;
+    if (!enrolled) {
+      const base = (user.email ?? "player").split("@")[0]?.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 14) || "player";
+      for (let attempt = 0; attempt < 5 && !enrolled; attempt++) {
+        const candidate = attempt === 0 ? base.padEnd(3, "0") : `${base.slice(0, 12)}_${Math.floor(Math.random() * 900 + 100)}`;
+        const { data: created, error: cErr } = await d.from("market_players")
+          .insert({ user_id: user.id, handle: candidate, display_name: candidate })
+          .select("handle, display_name").maybeSingle();
+        if (created) enrolled = created;
+        else if (cErr && cErr.code !== "23505") throw new Error(cErr.message);
+      }
+    }
     const mine: Record<string, { symbol: string; note: string | null }> = {};
     for (const p of picks ?? []) mine[String(p.category)] = { symbol: String(p.symbol), note: p.note ? String(p.note) : null };
     return NextResponse.json({
       ok: true, day,
-      profile: profile ? { handle: profile.handle, displayName: profile.display_name } : null,
+      profile: enrolled ? { handle: enrolled.handle, displayName: enrolled.display_name } : null,
       picks: mine,
       universe: Object.fromEntries(MARKET_IDS.map((m) => [m, { label: MARKETS[m].label, symbols: MARKETS[m].symbols }])),
     });
