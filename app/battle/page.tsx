@@ -8,7 +8,7 @@ import {
   ArrowUpRight, ArrowDownRight, Flame, Users,
   BarChart3, Percent, DollarSign, HelpCircle
 } from 'lucide-react';
-import { getAIStatistics, getPicks, getAIModels, type StockPick, type AIModel } from '@/lib/supabase';
+import { getPerModelStatistics, getPicks, getAIModels, type StockPick, type AIModel } from '@/lib/supabase';
 import { JavariHelpButton } from '@/components/JavariWidget';
 
 // Medals for top 3
@@ -57,7 +57,7 @@ function AILeaderboardCard({ ai, rank, isExpanded, onToggle }: {
         {/* AI Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-lg text-white truncate">{ai.displayName}</h3>
+            <h3 className="font-bold text-lg text-white truncate">{ai.name}</h3>
             {isTop3 && <Crown className="w-4 h-4 text-yellow-400" />}
           </div>
           <div className="text-sm text-gray-400">
@@ -102,10 +102,10 @@ function AILeaderboardCard({ ai, rank, isExpanded, onToggle }: {
             </div>
           </div>
           <Link 
-            href={`/ai/${ai.name.toLowerCase().replace(/ /g, '_').replace(/[^a-z0-9_]/g, '')}`}
+            href={`/ai/${ai.slug}`}
             className="block mt-4 text-center text-sm text-cyan-400 hover:text-cyan-300"
           >
-            View {ai.displayName}'s Full Profile →
+            View {ai.name}'s Full Profile →
           </Link>
         </div>
       )}
@@ -170,7 +170,7 @@ function BattlePickCard({ pick }: { pick: StockPick }) {
 }
 
 export default function AIBattlePage() {
-  const [aiStats, setAiStats] = useState<any[]>([]);
+  const [aiStats, setAiStats] = useState<Awaited<ReturnType<typeof getPerModelStatistics>>>([]);
   const [picks, setPicks] = useState<StockPick[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedAI, setExpandedAI] = useState<string | null>(null);
@@ -184,7 +184,7 @@ export default function AIBattlePage() {
     setLoading(true);
     try {
       const [statsData, picksData] = await Promise.all([
-        getAIStatistics(),
+        getPerModelStatistics(),
         getPicks({ limit: 100 }),
       ]);
       setAiStats(statsData);
@@ -318,7 +318,7 @@ export default function AIBattlePage() {
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
               <Flame className="w-6 h-6 text-orange-400" />
-              {selectedAI ? `${aiStats.find(a => a.id === selectedAI)?.displayName}'s Picks` : 'Recent Picks'}
+              {selectedAI ? `${aiStats.find(a => a.id === selectedAI)?.name}'s Picks` : 'Recent Picks'}
             </h2>
             
             {selectedAI && (

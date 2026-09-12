@@ -15,7 +15,7 @@ function db(): SupabaseClient {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false }, global: { fetch: (i, init) => fetch(i, { ...init, cache: "no-store" }) } });
 }
 
-export type Model = { id: string; display_name: string; provider: string; color: string | null; tagline: string | null; specialty: string | null; javari_model: string };
+export type Model = { id: string; display_name: string; slug: string | null; provider: string; color: string | null; tagline: string | null; specialty: string | null; javari_model: string };
 export type Pick = {
   id: string; modelId: string; symbol: string; confidence: number;
   entry: number; current: number | null; target: number; stop: number;
@@ -42,7 +42,7 @@ function toPick(r: Record<string, unknown>): Pick {
 }
 
 export async function getActiveModels(): Promise<Model[]> {
-  const { data, error } = await db().from("ai_models").select("id, display_name, provider, color, tagline, specialty, javari_model")
+  const { data, error } = await db().from("ai_models").select("id, display_name, slug, provider, color, tagline, specialty, javari_model")
     .eq("is_active", true).not("javari_model", "is", null).order("display_name");
   if (error) throw new Error(`models: ${error.message}`);
   return (data ?? []) as unknown as Model[];

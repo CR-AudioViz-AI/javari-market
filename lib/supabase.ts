@@ -120,11 +120,24 @@ export interface Pick {
   expiry_date: string
   price_updated_at: string
   closed_at?: string
+  created_at: string
+  updated_at?: string
+  // 2026-09-11: joined from ai_models by getPicks. Pages group and colour by these
+  // ("Unknown" everywhere before), and every pick row only carries ai_model_id.
+  ai_display_name?: string
+  ai_slug?: string
+  ai_color?: string
+  ai_provider?: string
 }
 
 export interface AIModel {
   id: string
   name: string
+  is_active?: boolean
+  display_name: string
+  slug?: string
+  color?: string
+  tagline?: string
   provider: string
   model: string
   total_picks: number
@@ -158,6 +171,25 @@ export interface OverallStats {
   activeModels: number
 }
 
+/** Attach each model's display fields to a set of picks. Rows carry only ai_model_id,
+ *  and pages group and colour by the model's name. 2026-09-11 */
+async function withModels(sb: SupabaseClient, rows: Pick[]): Promise<Pick[]> {
+  if (!rows.length) return rows
+  const { data: models, error } = await sb.from('ai_models').select('id, display_name, slug, color, provider')
+  if (error) throw error
+  const byId = new Map((models ?? []).map((m) => [m.id as string, m]))
+  return rows.map((r) => {
+    const m = byId.get(r.ai_model_id)
+    return {
+      ...r,
+      ai_display_name: (m?.display_name as string) ?? 'Retired model',
+      ai_slug: (m?.slug as string) ?? undefined,
+      ai_color: (m?.color as string) ?? undefined,
+      ai_provider: (m?.provider as string) ?? undefined,
+    }
+  })
+}
+
 export async function getPicks(opts: {
   assetType?: AssetType
   status?: 'active' | 'closed'
@@ -174,7 +206,7 @@ export async function getPicks(opts: {
   if (opts.limit) q = q.limit(opts.limit)
   const { data, error } = await q
   if (error) throw error
-  return (data ?? []) as Pick[]
+  return withModels(sb, (data ?? []) as Pick[])
 }
 
 export async function getAIModels(): Promise<AIModel[]> {
@@ -185,6 +217,41 @@ export async function getAIModels(): Promise<AIModel[]> {
     .order('win_rate', { ascending: false })
   if (error) throw error
   return (data ?? []) as AIModel[]
+}
+
+/** Per-model statistics, which is what the battle and comparison pages need.
+ *  2026-09-12: they were calling getAIStatistics (one overall object) and mapping over
+ *  it as if it were a list, so those sections rendered nothing. */
+export async function getPerModelStatistics(): Promise<Array<{
+  id: string; name: string; slug: string; color?: string; provider: string;
+  totalPicks: number; activePicks: number; wins: number; losses: number;
+  winRate: number; avgConfidence: number; totalProfitLossPercent: number;
+}>> {
+  const [picks, models] = await Promise.all([getPicks({ limit: 2000 }), getAIModels()])
+  return models
+    .filter((m) => m.is_active !== false)
+    .map((m) => {
+      const mine = picks.filter((p) => p.ai_model_id === m.id)
+      const closed = mine.filter((p) => p.status === 'closed')
+      const wins = closed.filter((p) => p.result === 'win').length
+      const losses = closed.filter((p) => p.result === 'loss').length
+      const conf = mine.map((p) => p.confidence).filter((n) => Number.isFinite(n))
+      return {
+        id: m.id,
+        name: m.display_name ?? m.name,
+        slug: m.slug ?? m.id,
+        color: m.color,
+        provider: m.provider,
+        totalPicks: mine.length,
+        activePicks: mine.filter((p) => p.status === 'active').length,
+        wins,
+        losses,
+        winRate: wins + losses ? Math.round((wins / (wins + losses)) * 100) : 0,
+        avgConfidence: conf.length ? Math.round(conf.reduce((a, b) => a + b, 0) / conf.length) : 0,
+        totalProfitLossPercent: Number(closed.reduce((sum, p) => sum + (p.profit_loss_percent ?? 0), 0).toFixed(2)),
+      }
+    })
+    .sort((a, b) => b.winRate - a.winRate || b.totalProfitLossPercent - a.totalProfitLossPercent)
 }
 
 export async function getAIStatistics(assetType?: AssetType): Promise<AIStatistics> {
@@ -221,7 +288,7 @@ export async function getHotPicks(limit = 10, assetType?: AssetType): Promise<Pi
   if (assetType) q = q.eq('asset_type', assetType)
   const { data, error } = await q
   if (error) throw error
-  return (data ?? []) as Pick[]
+  return withModels(sb, (data ?? []) as Pick[])
 }
 
 export async function getOverallStats(): Promise<OverallStats> {
@@ -256,7 +323,7 @@ export async function getRecentWinners(limit = 5, assetType?: AssetType): Promis
   if (assetType) q = q.eq('asset_type', assetType)
   const { data, error } = await q
   if (error) throw error
-  return (data ?? []) as Pick[]
+  return withModels(sb, (data ?? []) as Pick[])
 }
 
 // ---------------------------------------------------------------------------
@@ -294,6 +361,12 @@ export async function getPennyStockPicks(): Promise<Pick[]> {
 // Re-exported so the pages can keep importing from one module. StockPick is the
 // engine's name for the same shape this file calls Pick; both are kept because
 // renaming a type across an app is a larger change than this fix warrants.
-export type { StockPick } from './ai-prediction-engine';
+// 2026-09-12: StockPick used to point at the prediction engine's own interface, which
+// has never matched a stock_picks row (no status, no ai_model_id, no
+// price_change_percent, and a narrower `category`). Nine pages import it as the type of
+// what getPicks returns, so every one of them type-checked against the wrong shape -
+// invisible only because the build ignores type errors. StockPick is now an alias of
+// Pick, which is what those functions actually return.
+export type StockPick = Pick;
 export { AI_MODELS } from './types/ai-models';
 
