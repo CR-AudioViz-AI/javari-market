@@ -14,7 +14,11 @@ const LINKS = [
 
 export function MarketNav({ current }: { current: string }) {
   return (
-    <nav aria-label="Javari Market Oracle" className="sticky top-0 z-30 border-b border-white/10 bg-[#0a0f17]/95 backdrop-blur">
+    // 2026-09-12: sticky works when the app is opened directly. Embedded, the frame is
+    // sized to the whole page so nothing scrolls inside it and sticky does nothing - the
+    // bar just scrolled away. --embed-scroll-top is how far the site page has scrolled
+    // past the frame (set by the platform SDK); translating by it keeps the bar in view.
+    <nav aria-label="Javari Market Oracle" className="market-nav sticky top-0 z-30 border-b border-white/10 bg-[#0a0f17]/95 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-2 sm:px-4">
         <Link href="/" className="hidden shrink-0 py-3 text-lg font-bold tracking-tight text-white sm:block">
           Javari <span className="text-sky-400">Market Oracle</span>

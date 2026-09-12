@@ -833,3 +833,14 @@ img {
     will-change: transform;
   }
 }
+
+
+/* 2026-09-12: keep the app's own navigation in view while the SITE page scrolls.
+   Embedded, the frame has no scrollbar of its own, so position:sticky never fires;
+   the platform sets --embed-scroll-top to how far the frame has scrolled past the
+   viewport and the bar is translated to match. Opened directly, the variable is unset
+   and plain sticky does the work. */
+html[data-embedded] .market-nav {
+  transform: translateY(var(--embed-scroll-top, 0px));
+  will-change: transform;
+}

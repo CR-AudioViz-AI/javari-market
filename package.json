@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@craudioviz/platform-sdk": "git+https://github.com/CR-AudioViz-AI/platform-sdk.git#ed68867fdf07ae29668098412e00b0dcd5884b26",
+    "@craudioviz/platform-sdk": "git+https://github.com/CR-AudioViz-AI/platform-sdk.git#91b55b36acb25a56bc8492ba6e05e0535e3bd202",
     "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-avatar": "^1.0.4",
     "@radix-ui/react-select": "^2.0.0",
