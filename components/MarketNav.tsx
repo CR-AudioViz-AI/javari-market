@@ -4,6 +4,7 @@ import Link from "next/link";
 
 const LINKS = [
   { href: "/", label: "Today's picks" },
+  { href: "/research/sp500", label: "Research" },
   { href: "/my-picks", label: "My picks" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/results", label: "Results" },
@@ -21,7 +22,7 @@ export function MarketNav({ current }: { current: string }) {
         <ul className="flex flex-1 gap-1 overflow-x-auto py-1.5 text-sm [scrollbar-width:none]">
           {LINKS.map((l) => (
             <li key={l.href} className="shrink-0">
-              <Link href={l.href} aria-current={current === l.href ? "page" : undefined}
+              <Link href={l.href} aria-current={current === l.href || (l.href.startsWith("/research") && current === "/research") ? "page" : undefined}
                 className={`inline-flex min-h-[2.75rem] items-center whitespace-nowrap rounded-md px-3 ${current === l.href ? "bg-white/10 font-semibold text-white" : "text-gray-300 hover:bg-white/5 hover:text-white"}`}>
                 {l.label}
               </Link>
