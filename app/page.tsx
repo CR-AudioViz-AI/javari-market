@@ -56,6 +56,11 @@ export default async function Home() {
               <h2 id={`m-${board.market}`} className="text-lg font-semibold text-white">{board.label}</h2>
               <p className="text-xs text-gray-400">{board.benchmark ? `Measured against ${board.benchmark}` : ""}</p>
             </div>
+            {board.pilot && (
+              <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-100 ring-1 ring-amber-500/25">
+                First run — these picks were made before the engine recorded each market&rsquo;s index price, so they are shown for their reasoning but excluded from the standings. Scored picks begin Monday.
+              </p>
+            )}
             {board.agreement && (
               <p className="mt-2 rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-100 ring-1 ring-sky-500/25">
                 {board.agreement.count} of {board.picks.length} models independently chose <strong>{board.agreement.symbol}</strong>.

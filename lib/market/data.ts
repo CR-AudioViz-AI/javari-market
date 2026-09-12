@@ -83,7 +83,7 @@ export async function getStandings(): Promise<Standing[]> {
   const models = await getActiveModels();
   const ids = models.map((m) => m.id);
   if (!ids.length) return [];
-  const { data, error } = await d.from("stock_picks").select("ai_model_id, status, result, profit_loss_percent, confidence, alpha, market_category").in("ai_model_id", ids);
+  const { data, error } = await d.from("stock_picks").select("ai_model_id, status, result, profit_loss_percent, confidence, alpha, market_category").in("ai_model_id", ids).eq("pilot", false);
   if (error) throw new Error(`standings: ${error.message}`);
   const rows = data ?? [];
   return models.map((model) => {
@@ -123,8 +123,8 @@ export async function getRecentClosed(limit = 12): Promise<(Pick & { modelName: 
 
 // ── The board: every market, every model's pick, ranked so the models with the best
 //    record appear first. 2026-09-12 (Roy: "push the winners to the top").
-export type BoardPick = Pick & { model: Model; rank: number; record: { winRate: number | null; avgAlpha: number | null; scored: number } };
-export type MarketBoard = { market: string; label: string; benchmark: string | null; picks: BoardPick[]; agreement: { symbol: string; count: number } | null };
+export type BoardPick = Pick & { model: Model; rank: number; pilot: boolean; record: { winRate: number | null; avgAlpha: number | null; scored: number } };
+export type MarketBoard = { market: string; label: string; benchmark: string | null; picks: BoardPick[]; agreement: { symbol: string; count: number } | null; pilot: boolean };
 
 const MARKET_LABELS: Record<string, string> = {
   sp500: "S&P 500", nasdaq: "Nasdaq 100", dow: "Dow 30", penny: "Penny stocks", crypto: "Crypto",
@@ -154,7 +154,7 @@ export async function getBoards(): Promise<{ pickDate: string | null; boards: Ma
       .map((r) => {
         const p = toPick(r as Record<string, unknown>);
         const model = byId.get(p.modelId);
-        return model ? { ...p, model, rank: rankOf.get(p.modelId) ?? 99, record: recordOf.get(p.modelId) ?? { winRate: null, avgAlpha: null, scored: 0 } } : null;
+        return model ? { ...p, model, rank: rankOf.get(p.modelId) ?? 99, pilot: r.pilot === true, record: recordOf.get(p.modelId) ?? { winRate: null, avgAlpha: null, scored: 0 } } : null;
       })
       .filter((p): p is BoardPick => p !== null)
       .sort((a, b) => a.rank - b.rank || b.confidence - a.confidence);
@@ -167,6 +167,7 @@ export async function getBoards(): Promise<{ pickDate: string | null; boards: Ma
       benchmark: picks[0]?.benchmarkSymbol ?? null,
       picks,
       agreement: top && top[1] > 1 ? { symbol: top[0], count: top[1] } : null,
+      pilot: picks.every((p) => p.pilot),
     });
   }
   return { pickDate, boards };
@@ -200,7 +201,8 @@ export async function getCompetition(opts: { weekStart?: string } = {}): Promise
     ? { from: opts.weekStart, to: new Date(new Date(`${opts.weekStart}T00:00:00Z`).getTime() + 6 * 86_400_000).toISOString().slice(0, 10) }
     : null;
 
-  let modelQ = d.from("stock_picks").select("ai_model_id, status, result, profit_loss_percent, alpha, pick_date").not("javari_request_id", "is", null);
+  // Pilot picks (the first run, made before index prices were recorded) never count.
+  let modelQ = d.from("stock_picks").select("ai_model_id, status, result, profit_loss_percent, alpha, pick_date").not("javari_request_id", "is", null).eq("pilot", false);
   let playerQ = d.from("market_player_picks").select("user_id, status, result, return_percent, alpha, pick_date, market_players(handle, display_name)");
   if (range) {
     modelQ = modelQ.gte("pick_date", range.from).lte("pick_date", range.to);

@@ -40,6 +40,9 @@ interface PickResult {
   id: string;
   ticker: string;
   asset_type: string;
+  market_category?: string | null;
+  benchmark_symbol?: string | null;
+  benchmark_entry?: number | null;
   direction: string;
   entry_price: number;
   current_price: number;
@@ -58,20 +61,43 @@ async function fetchCurrentStockPrice(ticker: string): Promise<number | null> {
   return getStockPrice(ticker);
 }
 
-async function fetchCryptoPrice(ticker: string): Promise<number | null> {
-  const coinId = CRYPTO_MAP[ticker.toUpperCase()];
-  if (!coinId) return null;
-  
-  try {
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`
-    );
-    const data = await response.json();
-    return data[coinId]?.usd || null;
-  } catch (error) {
-    console.error(`Failed to fetch crypto price for ${ticker}:`, error);
-    return null;
+// 2026-09-12: was one uncached CoinGecko call per pick, and any non-200 silently became
+// "no price" - six XRP picks meant six calls, the free endpoint rate-limited them, and
+// the whole crypto market failed to settle with only "Could not fetch price for XRP" to
+// show for it. Now: one batched call for every coin, cached for the run, a real error
+// message, and one retry.
+let cryptoCache: Map<string, number> | null = null;
+
+async function loadCryptoPrices(): Promise<Map<string, number>> {
+  if (cryptoCache) return cryptoCache;
+  const ids = [...new Set(Object.values(CRYPTO_MAP))].join(',');
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`;
+  let lastError = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) { lastError = `CoinGecko HTTP ${res.status}`; await new Promise((r) => setTimeout(r, 2000)); continue; }
+      const data = (await res.json()) as Record<string, { usd?: number }>;
+      const out = new Map<string, number>();
+      for (const [ticker, coinId] of Object.entries(CRYPTO_MAP)) {
+        const price = data[coinId]?.usd;
+        if (typeof price === 'number') out.set(ticker, price);
+      }
+      cryptoCache = out;
+      return out;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
   }
+  console.error(JSON.stringify({ level: 'error', msg: 'market.crypto_prices_failed', error: lastError }));
+  cryptoCache = new Map();
+  return cryptoCache;
+}
+
+async function fetchCryptoPrice(ticker: string): Promise<number | null> {
+  const prices = await loadCryptoPrices();
+  return prices.get(ticker.toUpperCase()) ?? null;
 }
 
 // ----- RESULT CALCULATION -----
@@ -231,7 +257,7 @@ export async function GET(request: NextRequest) {
         // Fetch current price
         let currentPrice: number | null = null;
         
-        if (pick.asset_type === 'crypto') {
+        if (pick.asset_type === 'crypto' || pick.market_category === 'crypto') {
           currentPrice = await fetchCryptoPrice(pick.ticker);
         } else {
           currentPrice = await fetchCurrentStockPrice(pick.ticker);
@@ -258,6 +284,18 @@ export async function GET(request: NextRequest) {
         
         // 2026-09-12: score the pick against its market's benchmark over the same
         // window. Rising with a rising index is not skill; alpha is the difference.
+        // 2026-09-12: a pick made before benchmark capture shipped has no entry price of
+        // its own. If the index price for that date was recorded, use it; never invent one.
+        if (pick.benchmark_symbol && !pick.benchmark_entry) {
+          const { data: stored } = await supabase
+            .from('market_benchmark_prices').select('price')
+            .eq('pick_date', pick.pick_date).eq('symbol', pick.benchmark_symbol).maybeSingle();
+          if (stored) {
+            pick.benchmark_entry = Number(stored.price);
+            updateData.benchmark_entry = Number(stored.price);
+          }
+        }
+
         if (pick.benchmark_symbol && pick.benchmark_entry) {
           try {
             const benchNow = pick.benchmark_symbol === 'BTC'
