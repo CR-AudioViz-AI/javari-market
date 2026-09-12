@@ -6,12 +6,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runAllCalibrations, getCalibrationReport } from '@/lib/learning/calibration-engine';
 import { generateJavariWeeklyReport } from '@/lib/learning/javari-consensus';
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 
 export const dynamic = "force-dynamic";
 
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
+// 2026-09-11: was ReturnType<typeof createClient> with no createClient imported (it is
+// require()d at runtime), so this file never type-checked.
+let _supabase: SupabaseClient | null = null;
 function getSupabase() {
   // 2026-08-19: this function was CORRUPTED in 27 files, byte-identically.
   // `return _supabase;` had been spliced into the middle of the options object:
@@ -77,18 +80,17 @@ export async function GET(request: NextRequest) {
       secretKey()
     );
 
-    await supabase
-      .from('market_oracle_learning_queue')
+    // 2026-09-11: was written to market_oracle_learning_queue, a table of the retired
+    // pick system that nothing ever read back. Weekly reports now live in their own
+    // table so they can actually be shown on the site.
+    const { error: reportError } = await supabase
+      .from('market_weekly_reports')
       .insert({
-        task_type: 'GENERATE_REPORT',
-        status: 'COMPLETE',
-        result: {
-          calibration_report: calibrationReport,
-          javari_report: javariReport,
-          generated_at: new Date().toISOString(),
-        },
-        processed_at: new Date().toISOString(),
+        week_ending: new Date().toISOString().slice(0, 10),
+        calibration_report: calibrationReport,
+        summary: javariReport,
       });
+    if (reportError) console.error(JSON.stringify({ level: 'error', msg: 'market.weekly_report_write_failed', error: reportError.message }));
 
     return NextResponse.json({
       success: true,

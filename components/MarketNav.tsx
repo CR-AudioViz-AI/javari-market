@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/results", label: "Results" },
   { href: "/how-it-works", label: "How it works" },
+  { href: "/legal", label: "Legal" },
 ];
 
 export function MarketNav({ current }: { current: string }) {
