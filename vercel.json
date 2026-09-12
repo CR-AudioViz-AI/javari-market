@@ -22,14 +22,6 @@
     {
       "path": "/api/outcomes",
       "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/calibration",
-      "schedule": "0 1 * * 0"
-    },
-    {
-      "path": "/api/cron/auto-picks",
-      "schedule": "35 13 * * 1-5"
     }
   ]
 }
