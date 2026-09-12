@@ -1,285 +1,61 @@
 // app/leaderboard/page.tsx
-// Market Oracle AI Leaderboard Page
-// Created: December 23, 2025
+// Purpose: how the six models are actually doing - win rate, total return, open picks
+//   and average confidence. Phone-first.
+// Date: 2026-09-11 (rebuilt)
+//
+// CR AudioViz AI, LLC · EIN 39-3646201
+import Link from "next/link";
+import { getStandings } from "@/lib/market/data";
+import { MarketNav } from "@/components/MarketNav";
+import { MarketDisclaimer } from "@/components/MarketDisclaimer";
 
-'use client';
+export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { 
-  Trophy, Medal, Award, TrendingUp, TrendingDown,
-  Target, Zap, Brain, Crown, RefreshCw, ChevronRight
-} from 'lucide-react';
-
-interface AIPerformance {
-  model: string;
-  displayName: string;
-  totalPicks: number;
-  correctPicks: number;
-  accuracy: number;
-  avgReturn: number;
-  streak: number;
-  tier: string;
-}
-
-interface LeaderboardData {
-  success: boolean;
-  leaderboard: AIPerformance[];
-  stats: {
-    totalPicks: number;
-    avgAccuracy: number;
-    bestPerformer: string;
-  };
-  updated_at: string;
-}
-
-const tierColors: Record<string, string> = {
-  large: 'bg-purple-500/20 text-purple-300 border-purple-500/50',
-  medium: 'bg-blue-500/20 text-blue-300 border-blue-500/50',
-  small: 'bg-green-500/20 text-green-300 border-green-500/50',
-  meta: 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 border-yellow-500/50',
-};
-
-const getRankIcon = (rank: number) => {
-  switch (rank) {
-    case 1: return <Trophy className="w-6 h-6 text-yellow-400" />;
-    case 2: return <Medal className="w-6 h-6 text-gray-400" />;
-    case 3: return <Award className="w-6 h-6 text-amber-600" />;
-    default: return <span className="text-gray-500 font-bold">#{rank}</span>;
-  }
-};
-
-export default function LeaderboardPage() {
-  const [data, setData] = useState<LeaderboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchLeaderboard = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/leaderboard');
-      const result = await response.json();
-      setData(result);
-    } catch (err) {
-      setError('Failed to load leaderboard');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLeaderboard();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-center h-96">
-            <RefreshCw className="w-12 h-12 animate-spin text-purple-500" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
-        <div className="max-w-6xl mx-auto text-center py-20">
-          <p className="text-red-400">{error || 'Unable to load leaderboard'}</p>
-          <Button onClick={fetchLeaderboard} className="mt-4">
-            <RefreshCw className="w-4 h-4 mr-2" /> Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const { leaderboard, stats } = data;
+export default async function Leaderboard() {
+  const standings = await getStandings();
+  const scored = standings.filter((s) => s.wins + s.losses > 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              <Trophy className="w-10 h-10 text-yellow-400" />
-              AI Leaderboard
-            </h1>
-            <p className="text-gray-400 mt-2">
-              Tracking performance across {stats.totalPicks} predictions
-            </p>
-          </div>
-          <Button onClick={fetchLeaderboard} variant="outline" className="border-purple-500/50">
-            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
-          </Button>
-        </div>
+    <>
+      <MarketNav current="/leaderboard" />
+      <main id="main" className="mx-auto max-w-5xl px-3 py-5 sm:px-4">
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">Leaderboard</h1>
+        <p className="mt-1 text-sm text-gray-300">A pick closes when it hits its target, hits its stop, or reaches seven days. Win rate counts closed picks only.</p>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-gray-800/50 border-purple-500/30">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="p-3 bg-purple-500/20 rounded-xl">
-                <Target className="w-8 h-8 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Average Accuracy</p>
-                <p className="text-3xl font-bold text-white">{stats.avgAccuracy.toFixed(1)}%</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gray-800/50 border-yellow-500/30">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="p-3 bg-yellow-500/20 rounded-xl">
-                <Crown className="w-8 h-8 text-yellow-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Top Performer</p>
-                <p className="text-2xl font-bold text-white">{stats.bestPerformer}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gray-800/50 border-green-500/30">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="p-3 bg-green-500/20 rounded-xl">
-                <Zap className="w-8 h-8 text-green-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Total Predictions</p>
-                <p className="text-3xl font-bold text-white">{stats.totalPicks.toLocaleString()}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {!scored.length && (
+          <p className="mt-5 rounded-xl border border-white/10 bg-[#111827] p-4 text-sm text-gray-300">
+            No picks have closed yet, so there is nothing to rank. Today's open picks are on the <Link href="/" className="text-sky-300 underline">picks page</Link>.
+          </p>
+        )}
 
-        {/* Leaderboard Table */}
-        <Card className="bg-gray-800/50 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Brain className="w-5 h-5 text-purple-400" />
-              AI Model Rankings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {leaderboard.map((ai, index) => (
-                <div
-                  key={ai.model}
-                  className={`flex items-center justify-between p-4 rounded-xl bg-gray-900/50 border ${
-                    index === 0 ? 'border-yellow-500/50 bg-yellow-500/5' :
-                    index === 1 ? 'border-gray-400/50 bg-gray-400/5' :
-                    index === 2 ? 'border-amber-600/50 bg-amber-600/5' :
-                    'border-gray-700'
-                  }`}
-                >
-                  {/* Rank & Name */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 flex justify-center">
-                      {getRankIcon(index + 1)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-lg">{ai.displayName}</span>
-                        <Badge className={tierColors[ai.tier] || 'bg-gray-500/20'}>
-                          {ai.tier}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        {ai.correctPicks}/{ai.totalPicks} correct predictions
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="flex items-center gap-8">
-                    {/* Accuracy */}
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500 uppercase">Accuracy</p>
-                      <p className={`text-xl font-bold ${
-                        ai.accuracy >= 60 ? 'text-green-400' :
-                        ai.accuracy >= 50 ? 'text-yellow-400' :
-                        'text-red-400'
-                      }`}>
-                        {ai.accuracy.toFixed(1)}%
-                      </p>
-                    </div>
-
-                    {/* Avg Return */}
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500 uppercase">Avg Return</p>
-                      <p className={`text-xl font-bold flex items-center gap-1 ${
-                        ai.avgReturn >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {ai.avgReturn >= 0 ? (
-                          <TrendingUp className="w-4 h-4" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4" />
-                        )}
-                        {ai.avgReturn >= 0 ? '+' : ''}{ai.avgReturn.toFixed(2)}%
-                      </p>
-                    </div>
-
-                    {/* Streak */}
-                    <div className="text-right min-w-[80px]">
-                      <p className="text-xs text-gray-500 uppercase">Streak</p>
-                      <p className="text-xl font-bold text-orange-400">
-                        🔥 {ai.streak}
-                      </p>
-                    </div>
+        <ul className="mt-5 space-y-3">
+          {standings.map((s, i) => (
+            <li key={s.model.id} className="rounded-xl border border-white/10 bg-[#111827] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="w-5 shrink-0 text-sm text-gray-500">{s.wins + s.losses > 0 ? i + 1 : "–"}</span>
+                  <span aria-hidden className="h-3 w-3 shrink-0 rounded-full" style={{ background: s.model.color ?? "#64748b" }} />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-white">{s.model.display_name}</p>
+                    <p className="truncate text-xs text-gray-400">{s.model.tagline ?? s.model.provider}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/ai-picks">
-            <Card className="bg-gray-800/50 border-gray-700 hover:border-cyan-500/50 transition-all cursor-pointer">
-              <CardContent className="p-6 flex items-center justify-between">
-                <span className="text-white font-medium">View AI Picks</span>
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/battle">
-            <Card className="bg-gray-800/50 border-gray-700 hover:border-purple-500/50 transition-all cursor-pointer">
-              <CardContent className="p-6 flex items-center justify-between">
-                <span className="text-white font-medium">AI Battle Arena</span>
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/competition">
-            <Card className="bg-gray-800/50 border-gray-700 hover:border-yellow-500/50 transition-all cursor-pointer">
-              <CardContent className="p-6 flex items-center justify-between">
-                <span className="text-white font-medium">Competition Mode</span>
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center text-gray-500 text-sm">
-          <p>Last updated: {new Date(data.updated_at).toLocaleString()}</p>
-          <p className="mt-1">
-            Part of the{' '}
-            <a href="https://craudiovizai.com" className="text-cyan-400 hover:underline">
-              CR AudioViz AI
-            </a>{' '}
-            ecosystem
-          </p>
-        </div>
-      </div>
-    </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-lg font-bold leading-none text-white">{s.winRate === null ? "—" : `${s.winRate.toFixed(0)}%`}</p>
+                  <p className="mt-1 text-xs text-gray-400">win rate</p>
+                </div>
+              </div>
+              <dl className="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
+                <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Closed</dt><dd className="mt-0.5 font-semibold text-white">{s.wins}–{s.losses}</dd></div>
+                <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Open</dt><dd className="mt-0.5 font-semibold text-white">{s.open}</dd></div>
+                <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Total return</dt><dd className={`mt-0.5 font-semibold ${s.totalReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{s.totalReturn >= 0 ? "+" : ""}{s.totalReturn.toFixed(1)}%</dd></div>
+                <div className="rounded-lg bg-black/30 py-2"><dt className="text-gray-400">Avg conf.</dt><dd className="mt-0.5 font-semibold text-white">{s.avgConfidence === null ? "—" : `${s.avgConfidence.toFixed(0)}%`}</dd></div>
+              </dl>
+            </li>
+          ))}
+        </ul>
+      </main>
+      <MarketDisclaimer />
+    </>
   );
 }
