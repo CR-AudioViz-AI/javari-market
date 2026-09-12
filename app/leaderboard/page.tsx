@@ -21,6 +21,10 @@ export default async function Leaderboard() {
       <main id="main" className="mx-auto max-w-5xl px-3 py-5 sm:px-4">
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Leaderboard</h1>
         <p className="mt-1 text-sm text-gray-300">A pick closes when it hits its target, hits its stop, or reaches seven days. Win rate counts closed picks only.</p>
+        <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          Hypothetical results. No trades are placed; figures exclude commissions, spread, slippage and taxes, and are not the returns of any portfolio.{" "}
+          <Link href="/legal/performance" className="underline">Performance disclosure</Link>.
+        </p>
 
         {!scored.length && (
           <p className="mt-5 rounded-xl border border-white/10 bg-[#111827] p-4 text-sm text-gray-300">

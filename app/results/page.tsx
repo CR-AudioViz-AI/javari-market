@@ -18,6 +18,10 @@ export default async function Results() {
       <main id="main" className="mx-auto max-w-5xl px-3 py-5 sm:px-4">
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Results</h1>
         <p className="mt-1 text-sm text-gray-300">Every pick that has closed, newest first.</p>
+        <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          Hypothetical results — no trades are placed, and costs are excluded.{" "}
+          <Link href="/legal/performance" className="underline">Performance disclosure</Link>.
+        </p>
         {!closed.length ? (
           <p className="mt-5 rounded-xl border border-white/10 bg-[#111827] p-4 text-sm text-gray-300">
             Nothing has closed yet. Picks run for seven days — see <Link href="/" className="text-sky-300 underline">today's picks</Link>.
