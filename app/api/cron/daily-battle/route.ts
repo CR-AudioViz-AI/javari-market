@@ -1,399 +1,49 @@
-// 2026-09-04: retired model replaced.
-//
-// gpt-4-turbo-preview no longer exists at the provider. A request naming it returns 404, and
-// most call sites treat a failed completion as an empty answer - so the feature
-// degrades silently rather than erroring, and nobody reports it.
-//
-// gpt-4.1-nano is the current equivalent under the platform's cost order, verified
-// answering this session. Found by sweeping the fleet with core's
-// audit-model-names guard, which no satellite runs: core has had it since
-// 25 August, when every free model named in the codebase turned out to be retired.
 // app/api/cron/daily-battle/route.ts
-// PRODUCTION CRON JOB: Daily AI Battle Automation
-// Runs daily at 9:30 AM EST (market open + 30 min)
-// Created: December 12, 2025 - Roy Henderson / CR AudioViz AI
-
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// Purpose: the daily AI battle - six named free AI models each pick one stock through
+//   Javari. Runs weekdays at 9:30 AM ET (market open + 30 minutes) via Vercel Cron.
+// Date: 2026-09-11 (rewritten)
+//
+// What changed on 2026-09-11 (Roy): the six invented personas ran on only three models,
+// two of them the same, and this route called OpenAI, Anthropic and Google directly with
+// its own keys. It now holds no provider key: every call goes through Javari's door, so
+// she logs each one and learns from the outcome. The engine lives in lib/market/battle.ts.
+//
+// Only the scheduler (or an operator holding CRON_SECRET) may run it.
+//
+// CR AudioViz AI, LLC · EIN 39-3646201
+import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
+import { createClient } from "@supabase/supabase-js";
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
-import { getStockPrices } from '@/lib/market/prices';
+import { runDailyBattle } from "@/lib/market/battle";
 
-// Force dynamic execution
-export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 minutes max
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
-// Lazy Supabase client — initialized on first request (not at module load time)
-// ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
-function getSupabase() {
-  if (!_supabase) {
-    const url = supabaseUrl();
-    const key = secretKey()|| "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
-    _supabase = createClient(url, key);
+function authorized(req: Request): boolean {
+  const secret = process.env.CRON_SECRET ?? "";
+  const got = Buffer.from((req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""));
+  const want = Buffer.from(secret);
+  if (!secret || got.length !== want.length) return false;
+  return timingSafeEqual(new Uint8Array(got), new Uint8Array(want));
+}
+
+export async function GET(req: Request): Promise<NextResponse> {
+  if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const url = supabaseUrl();
+  const key = secretKey();
+  if (!url || !key) {
+    console.error(JSON.stringify({ level: "error", msg: "market.battle.no_db_credentials" }));
+    return NextResponse.json({ ok: false, error: "Database credentials unavailable" }, { status: 503 });
   }
-  return _supabase;
-}
-// AI Model Configuration
-const AI_MODELS = [
-  { id: 'a1000000-0000-0000-0000-000000000001', name: 'TechVanguard AI', provider: 'openai', model: 'gpt-4.1-nano' },
-  // 2026-09-11: the Anthropic account behind every valid key has no credit ("credit balance
-  // too low"); the other keys are invalid. Until credits are added these two personas run
-  // on Gemini 3.6 Flash (Google's current Flash; 2.5 is closed to new users). Switch back: provider 'anthropic',
-  // model 'claude-haiku-4-5-20251001' (low cost) or a Sonnet model.
-  { id: 'a2000000-0000-0000-0000-000000000002', name: 'ValueHunter Pro', provider: 'google', model: 'gemini-3.6-flash' },
-  { id: 'a3000000-0000-0000-0000-000000000003', name: 'SwingTrader X', provider: 'openai', model: 'gpt-4.1-nano' },
-  { id: 'a4000000-0000-0000-0000-000000000004', name: 'DividendKing', provider: 'google', model: 'gemini-3.6-flash' },
-  { id: 'a5000000-0000-0000-0000-000000000005', name: 'CryptoQuantum', provider: 'openai', model: 'gpt-4.1-nano' },
-  // gemini-2.0-flash-exp was retired by Google (404) - GlobalMacro produced nothing.
-  { id: 'a6000000-0000-0000-0000-000000000006', name: 'GlobalMacro AI', provider: 'google', model: 'gemini-3.6-flash' },
-];
-
-// Ticker pools
-const STOCK_POOLS = {
-  regular: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'V', 'UNH', 'HD', 'MA', 'PG', 'JNJ', 'XOM', 'DIS', 'NFLX', 'CRM', 'AMD', 'INTC'],
-  penny: ['SOFI', 'PLTR', 'HOOD', 'RIVN', 'LCID', 'NIO', 'CLOV', 'IONQ', 'RKLB', 'JOBY', 'GRAB', 'OPEN', 'DNA', 'FCEL', 'PLUG'],
-  crypto: ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'AVAX', 'LINK', 'DOT', 'MATIC']
-};
-
-const CRYPTO_MAP: Record<string, string> = {
-  'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana', 'XRP': 'ripple',
-  'ADA': 'cardano', 'DOGE': 'dogecoin', 'AVAX': 'avalanche-2', 'LINK': 'chainlink',
-  'DOT': 'polkadot', 'MATIC': 'matic-network'
-};
-
-// ----- PRICE FETCHING FUNCTIONS -----
-
-// 2026-09-11: one call per ticker to Alpha Vantage (free: 25/day, 5/min) exhausted the
-// quota on the 35-stock pool, starving settlement. Batch lookup with fallbacks instead.
-async function fetchStockPrices(tickers: string[]): Promise<Map<string, number>> {
-  return getStockPrices(tickers);
-}
-
-async function fetchCryptoPrices(tickers: string[]): Promise<Map<string, number>> {
-  const prices = new Map<string, number>();
-  
+  const db = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
   try {
-    const coinIds = tickers.map(t => CRYPTO_MAP[t]).filter(Boolean).join(',');
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`
-    );
-    const data = await response.json();
-    
-    for (const ticker of tickers) {
-      const coinId = CRYPTO_MAP[ticker];
-      if (coinId && data[coinId]?.usd) {
-        prices.set(ticker, data[coinId].usd);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to fetch crypto prices:', error);
+    const report = await runDailyBattle(db, new Date());
+    console.info(JSON.stringify({ level: "info", msg: "market.battle.done", report }));
+    return NextResponse.json({ ok: report.errors.length === 0, report });
+  } catch (e) {
+    console.error(JSON.stringify({ level: "error", msg: "market.battle.failed", error: e instanceof Error ? e.message : String(e) }));
+    return NextResponse.json({ ok: false, error: "Battle failed" }, { status: 500 });
   }
-  
-  return prices;
-}
-
-// ----- AI PICK GENERATION -----
-
-async function generateAIPick(
-  model: typeof AI_MODELS[0],
-  category: 'regular' | 'penny' | 'crypto',
-  availablePrices: Map<string, number>
-): Promise<any | null> {
-  const tickers = Array.from(availablePrices.keys());
-  if (tickers.length === 0) return null;
-  
-  const tickerList = tickers.map(t => `${t}: $${availablePrices.get(t)?.toFixed(2)}`).join('\n');
-  
-  const systemPrompt = `You are ${model.name}, an AI stock analyst competing in Market Oracle.
-Your specialty: ${getModelSpecialty(model.id)}
-Today's date: ${new Date().toISOString().split('T')[0]}
-
-RULES:
-1. Pick ONE ${category} ${category === 'crypto' ? 'cryptocurrency' : 'stock'} from the list provided
-2. Provide your analysis and confidence level (0-100)
-3. Respond ONLY with valid JSON
-
-Return EXACTLY this JSON structure:
-{
-  "ticker": "SYMBOL",
-  "direction": "UP" or "DOWN",
-  "confidence": 75,
-  "target_price": 150.00,
-  "stop_loss": 130.00,
-  "reasoning": "2-3 sentence analysis",
-  "key_factors": ["factor1", "factor2", "factor3"]
-}`;
-
-  const userPrompt = `Available ${category} ${category === 'crypto' ? 'cryptocurrencies' : 'stocks'} with current prices:\n${tickerList}\n\nMake your pick:`;
-
-  try {
-    let response;
-    
-    if (model.provider === 'openai') {
-      response = await callOpenAI(systemPrompt, userPrompt, model.model);
-    } else if (model.provider === 'anthropic') {
-      response = await callAnthropic(systemPrompt, userPrompt, model.model);
-    } else if (model.provider === 'google') {
-      response = await callGemini(systemPrompt, userPrompt, model.model);
-    }
-    
-    if (!response) return null;
-    
-    // Parse JSON from response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    
-    const pick = JSON.parse(jsonMatch[0]);
-    return {
-      ...pick,
-      entry_price: availablePrices.get(pick.ticker) || 0,
-      ai_model_id: model.id,
-      category,
-      asset_type: category === 'crypto' ? 'crypto' : 'stock'
-    };
-  } catch (error) {
-    console.error(`${model.name} pick generation failed:`, error);
-    return null;
-  }
-}
-
-function getModelSpecialty(modelId: string): string {
-  const specialties: Record<string, string> = {
-    'a1000000-0000-0000-0000-000000000001': 'Technology & Growth Stocks - Focus on innovation, R&D, and market disruption',
-    'a2000000-0000-0000-0000-000000000002': 'Value Investing - Undervalued stocks with strong fundamentals',
-    'a3000000-0000-0000-0000-000000000003': 'Technical Analysis - Chart patterns, momentum, and swing trades',
-    'a4000000-0000-0000-0000-000000000004': 'Dividend & Income - High-yield, sustainable dividend stocks',
-    'a5000000-0000-0000-0000-000000000005': 'Crypto & Digital Assets - Blockchain and cryptocurrency analysis',
-    'a6000000-0000-0000-0000-000000000006': 'Macro & ETFs - Economic trends and sector allocation'
-  };
-  return specialties[modelId] || 'General market analysis';
-}
-
-// ----- AI API CALLS -----
-
-async function callOpenAI(system: string, user: string, model: string): Promise<string | null> {
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user }
-        ],
-        max_tokens: 500,
-        temperature: 0.7
-      })
-    });
-    
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || null;
-  } catch (error) {
-    console.error('OpenAI call failed:', error);
-    return null;
-  }
-}
-
-async function callAnthropic(system: string, user: string, model: string): Promise<string | null> {
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 500,
-        system: system,
-        messages: [{ role: 'user', content: user }]
-      })
-    });
-    
-    const data = await response.json();
-    return data.content?.[0]?.text || null;
-  } catch (error) {
-    console.error('Anthropic call failed:', error);
-    return null;
-  }
-}
-
-async function callGemini(system: string, user: string, model: string): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GOOGLE_GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${system}\n\n${user}` }] }],
-          // Gemini 3.x thinks before answering and spends output budget doing it; 500 tokens
-          // could leave the pick empty. 2048 leaves room. (3.x rejects thinkingBudget: 0.)
-          generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
-        })
-      }
-    );
-    const data = await response.json();
-    if (!response.ok) {
-      // Provider errors used to be swallowed: a retired model produced nothing for months.
-      console.error(`Gemini ${model} HTTP ${response.status}: ${JSON.stringify(data?.error ?? data).slice(0, 300)}`);
-      return null;
-    }
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  } catch (error) {
-    console.error('Gemini call failed:', error);
-    return null;
-  }
-}
-
-// ----- MAIN CRON HANDLER -----
-
-export async function GET(request: NextRequest) {
-  const supabase = getSupabase()!
-  // Verify cron secret for security
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  
-  // 2026-09-11: only the scheduler (or an operator holding CRON_SECRET) may run the
-  // battle. The old "?test=true" escape let anyone on the internet trigger it - four
-  // paid AI providers per call, and picks written straight into the leaderboard.
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  console.log(`[DAILY BATTLE] Starting - ${new Date().toISOString()}`);
-  
-  const results = {
-    timestamp: new Date().toISOString(),
-    picks_generated: 0,
-    picks_saved: 0,
-    errors: [] as string[],
-    ai_models_processed: [] as string[]
-  };
-  
-  try {
-    // Step 1: Fetch all current prices
-    console.log('[DAILY BATTLE] Fetching current prices...');
-    const stockPrices = await fetchStockPrices([...STOCK_POOLS.regular, ...STOCK_POOLS.penny]);
-    const cryptoPrices = await fetchCryptoPrices(STOCK_POOLS.crypto);
-    
-    console.log(`[DAILY BATTLE] Got ${stockPrices.size} stock prices, ${cryptoPrices.size} crypto prices`);
-    
-    // Step 2: Get current week/competition info
-    const today = new Date();
-    const weekNumber = Math.ceil((today.getDate()) / 7);
-    const pickDate = today.toISOString().split('T')[0];
-    const expiryDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
-    // Step 3: Generate picks for each AI model
-    // One pick per AI per day: a re-run or a scheduler retry must not give an AI a second
-    // pick (or a second paid call) on the same date.
-    const { data: already } = await supabase.from('stock_picks').select('ai_model_id').eq('pick_date', pickDate);
-    const pickedToday = new Set((already ?? []).map((r: { ai_model_id: string }) => r.ai_model_id));
-    for (const model of AI_MODELS) {
-      if (pickedToday.has(model.id)) { results.ai_models_processed.push(`${model.name} (already picked today)`); continue; }
-      console.log(`[DAILY BATTLE] Generating picks for ${model.name}...`);
-      
-      try {
-        // Each AI picks from regular stocks (or crypto for CryptoQuantum)
-        const category = model.id === 'a5000000-0000-0000-0000-000000000005' ? 'crypto' : 'regular';
-        const prices = category === 'crypto' ? cryptoPrices : stockPrices;
-        
-        const pick = await generateAIPick(model, category as any, prices);
-        
-        if (pick) {
-          results.picks_generated++;
-          
-          // Save to database
-          const { error } = await supabase.from('stock_picks').insert({
-            // 2026-09-11: id is a uuid column with a default. A text id (`pick-<ms>-xxxx`) made
-            // EVERY insert fail since ~December - four paid AI calls a day, results discarded.
-            ai_model_id: model.id,
-            ticker: pick.ticker,
-            symbol: pick.ticker,
-            company_name: pick.ticker, // Will be updated
-            category: pick.category,
-            asset_type: pick.asset_type,
-            direction: pick.direction,
-            confidence: pick.confidence,
-            entry_price: pick.entry_price,
-            current_price: pick.entry_price,
-            target_price: pick.target_price,
-            stop_loss: pick.stop_loss,
-            price_change_percent: 0,
-            price_change_dollars: 0,
-            reasoning: pick.reasoning,
-            reasoning_summary: pick.reasoning?.substring(0, 100),
-            key_factors: pick.key_factors,
-            risk_factors: [],
-            status: 'active',
-            week_number: weekNumber,
-            pick_date: pickDate,
-            expiry_date: expiryDate,
-            price_updated_at: new Date().toISOString()
-          });
-          
-          if (error) {
-            results.errors.push(`Failed to save ${model.name} pick: ${error.message}`);
-          } else {
-            results.picks_saved++;
-          }
-        }
-        
-        results.ai_models_processed.push(model.name);
-        
-        // Rate limiting between AI calls
-        await new Promise(r => setTimeout(r, 1000));
-        
-      } catch (error: any) {
-        results.errors.push(`${model.name} error: ${error.message}`);
-      }
-    }
-    
-    // Step 4: Log battle completion
-    console.log(`[DAILY BATTLE] Complete - ${results.picks_saved}/${results.picks_generated} picks saved`);
-    
-    // Step 5: Notify Javari for learning (optional)
-    await notifyJavariNewPicks(results.picks_saved);
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Daily battle completed',
-      ...results
-    });
-    
-  } catch (error: any) {
-    console.error('[DAILY BATTLE] Critical error:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'The request could not be completed.', code: 'INTERNAL_ERROR',
-      ...results
-    }, { status: 500 });
-  }
-}
-
-async function notifyJavariNewPicks(pickCount: number): Promise<void> {
-  // Send to Javari knowledge base for learning
-  try {
-    const sb = getSupabase();
-    await sb.from('javari_learning_queue').insert({
-      source: 'market_oracle',
-      event_type: 'daily_battle_complete',
-      data: { picks_generated: pickCount, timestamp: new Date().toISOString() },
-      status: 'pending'
-    });
-  } catch (error) {
-    console.log('Javari notification skipped:', error);
-  }
-}
-
-// Also support POST for manual triggers
-export async function POST(request: NextRequest) {
-  const supabase = getSupabase()!
-  return GET(request);
 }

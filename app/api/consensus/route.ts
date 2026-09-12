@@ -14,7 +14,11 @@ let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
   if (!_supabase) {
     const url = supabaseUrl();
-    const key = secretKey()|| "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
+    const key = secretKey();
+    // 2026-09-11: was `secretKey() || "<hard-coded anon JWT>"`. That key is now disabled,
+    // so the fallback silently produced a client that 401s on every query. No fallback:
+    // a missing credential is an error the caller can see.
+    if (!url || !key) throw new Error("Supabase credentials unavailable");
     _supabase = createClient(url, key);
   }
   // 2026-09-11: the return sat INSIDE the if - a warm server got undefined ->

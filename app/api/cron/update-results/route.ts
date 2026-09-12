@@ -4,20 +4,28 @@
 // Created: December 12, 2025 - Roy Henderson / CR AudioViz AI
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { secretKey, supabaseUrl } from "@craudioviz/platform-sdk";
 import { getStockPrice } from '@/lib/market/prices';
+import { javariOutcome } from '@/lib/javari/door';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 // Lazy Supabase client — initialized on first request (not at module load time)
 // ⚠️ _supabase MUST be declared before getSupabase() — TDZ guard
-let _supabase: ReturnType<typeof createClient> | null = null;
-function getSupabase() {
+// Typed as the plain client: without a Database generic, ReturnType<typeof createClient>
+// resolved every row to `never`, so nothing in this file type-checked (the build hides
+// this with ignoreBuildErrors).
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
   if (!_supabase) {
     const url = supabaseUrl();
-    const key = secretKey()|| "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk1NzUwNjUsImV4cCI6MjA1NTE1MTA2NX0.r3_3bXtqo6VCJqYHijtxdEpXkWyNVGKd67kNQvqkrD4";
+    const key = secretKey();
+    // 2026-09-11: was `secretKey() || "<hard-coded anon JWT>"`. That key is now disabled,
+    // so the fallback silently produced a client that 401s on every query. No fallback:
+    // a missing credential is an error the caller can see.
+    if (!url || !key) throw new Error("Supabase credentials unavailable");
     _supabase = createClient(url, key);
   }
   return _supabase;
@@ -262,7 +270,19 @@ export async function GET(request: NextRequest) {
           .from('stock_picks')
           .update(updateData)
           .eq('id', pick.id);
-        
+
+        // 2026-09-11: tell Javari how the pick turned out, so she learns which model
+        // reads markets best. Only for picks made through her door, and only once a
+        // pick actually closes.
+        if (pickResult.result !== 'pending' && pick.javari_request_id) {
+          const sent = await javariOutcome(
+            pick.javari_request_id as string,
+            pickResult.result === 'win' ? 'accepted' : 'corrected',
+            `${pick.symbol} ${pick.direction} from $${pick.entry_price}: ${pickResult.profit_loss_percent.toFixed(2)}%`,
+          );
+          if (!sent) results.errors.push(`Outcome not reported for ${pick.ticker}`);
+        }
+
         processedModelIds.add(pick.ai_model_id);
         results.picks_processed++;
         
